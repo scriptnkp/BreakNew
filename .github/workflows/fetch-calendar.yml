@@ -64,3 +64,4 @@ jobs:
           git add data/
           git diff --staged --quiet || git commit -m "calendar $(date -u +%FT%TZ)"
           git push
+
