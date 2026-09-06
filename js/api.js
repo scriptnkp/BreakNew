@@ -1,4 +1,4 @@
-/* ===== ชั้นดึงข้อมูล ===== */
+/* ===== ชั้นดึงข้อมูล: ไฟล์ในrepo → proxy → แคช ===== */
 var API = (function () {
 
   function fetchTimeout(url, ms) {
@@ -16,6 +16,15 @@ var API = (function () {
       });
   }
 
+  function parse(txt, wrap) {
+    if (/^\s*</.test(txt)) throw new Error("ได้ HTML (โดน rate limit)");
+    var raw = wrap ? JSON.parse(txt).contents : txt;
+    var data = JSON.parse(raw);
+    if (!Array.isArray(data)) throw new Error("ไม่ใช่ array");
+    if (!data.length) throw new Error("array ว่าง");
+    return data;
+  }
+
   function buildList() {
     var list = PROXIES.slice();
     if (CONFIG.MY_WORKER) {
@@ -24,35 +33,43 @@ var API = (function () {
     return list;
   }
 
-  function parse(txt, wrap) {
-    var raw = wrap ? JSON.parse(txt).contents : txt;
-    var data = JSON.parse(raw);
-    if (!Array.isArray(data)) throw new Error("not an array");
-    if (!data.length) throw new Error("empty array");
-    return data;
+  /* 1) ลองไฟล์ในrepoก่อน — same-origin ไม่มี CORS */
+  function tryLocal(onLog) {
+    onLog("→ อ่านไฟล์ในrepo data/calendar.json");
+    return fetchTimeout(CONFIG.LOCAL_URL + "?t=" + Date.now(), 8000)
+      .then(function (txt) {
+        var data = parse(txt, false);
+        onLog("✓ ไฟล์ในrepo สำเร็จ " + data.length + " รายการ");
+        return { data: data, via: "repo" };
+      });
   }
 
-  /* ไล่ยิง proxy ทีละตัวจนกว่าจะสำเร็จ */
-  function getCalendar(onLog) {
+  /* 2) proxy สำรอง */
+  function tryProxies(onLog) {
     var list = buildList();
-
     function step(i) {
       if (i >= list.length) return Promise.reject(new Error("proxy ทุกตัวใช้ไม่ได้"));
       var p = list[i];
       onLog("→ ลอง " + p.name + " (" + (i + 1) + "/" + list.length + ")");
-      var t0 = Date.now();
       return fetchTimeout(p.url(CONFIG.FF_URL), CONFIG.PROXY_TIMEOUT)
         .then(function (txt) {
           var data = parse(txt, p.wrap);
-          onLog("✓ " + p.name + " สำเร็จ " + data.length + " รายการ (" + (Date.now() - t0) + "ms)");
+          onLog("✓ " + p.name + " สำเร็จ " + data.length + " รายการ");
           return { data: data, via: p.name };
         })
         .catch(function (e) {
-          onLog("✗ " + p.name + " ล้มเหลว: " + e.message);
+          onLog("✗ " + p.name + ": " + e.message);
           return step(i + 1);
         });
     }
     return step(0);
+  }
+
+  function getCalendar(onLog) {
+    return tryLocal(onLog).catch(function (e) {
+      onLog("✗ ไฟล์ในrepo: " + e.message + " → ยังไม่ได้ตั้ง GitHub Actions?");
+      return tryProxies(onLog);
+    });
   }
 
   function getGold() {
@@ -60,21 +77,17 @@ var API = (function () {
       .then(function (txt) { return JSON.parse(txt); });
   }
 
-  /* แคชไว้ใน localStorage เผื่อ proxy ล่มทั้งหมด */
   function saveCache(data) {
-    try {
-      localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ t: Date.now(), data: data }));
-    } catch (e) {}
+    try { localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ t: Date.now(), data: data })); } catch (e) {}
   }
 
   function loadCache() {
     try {
       var c = JSON.parse(localStorage.getItem(CONFIG.CACHE_KEY));
-      if (c && c.data && Date.now() - c.t < 86400000) return c;
+      if (c && c.data && Date.now() - c.t < 604800000) return c;
     } catch (e) {}
     return null;
   }
 
   return { getCalendar: getCalendar, getGold: getGold, saveCache: saveCache, loadCache: loadCache };
 })();
-
