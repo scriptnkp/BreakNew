@@ -16,13 +16,26 @@
 
 <div class="bar">
   <button id="btnRefresh">รีเฟรช</button>
-  <div class="seg" id="viewSeg">
-    <button data-view="today" class="on">วันนี้</button>
-    <button data-view="upcoming">ข่าวถัดไป</button>
-    <button data-view="week">ทั้งสัปดาห์</button>
+
+  <div class="seg" data-group="view">
+    <button data-v="today" class="on">วันนี้</button>
+    <button data-v="upcoming">ข่าวถัดไป</button>
+    <button data-v="week">ทั้งสัปดาห์</button>
   </div>
-  <label><input type="checkbox" id="onlyHigh"> เฉพาะข่าวแรงสูง</label>
-  <label><input type="checkbox" id="onlyUSD" checked> เฉพาะ USD/EUR</label>
+
+  <div class="seg" data-group="imp">
+    <button data-v="all" class="on">ทุกความแรง</button>
+    <button data-v="high">สูง</button>
+    <button data-v="highmed">สูง+กลาง</button>
+  </div>
+
+  <div class="seg" data-group="ccy">
+    <button data-v="all">ทุกสกุล</button>
+    <button data-v="usd">USD</button>
+    <button data-v="usdeur" class="on">USD+EUR</button>
+  </div>
+
+  <span id="count" class="dim"></span>
   <span id="status" class="dim"></span>
 </div>
 
@@ -32,12 +45,14 @@
     <div class="big" id="px">--</div>
     <div id="pxSub" class="dim sm">กำลังโหลด</div>
   </div>
+
   <div class="card">
-    <div class="lbl">Bias จากข่าว</div>
-    <div class="big" id="bias">--</div>
-    <div class="gauge"><i id="gaugeBar"></i></div>
+    <div class="lbl">แนวโน้มรวม Buy / Sell</div>
+    <div class="big"><span id="buyPct" class="up">--</span><span class="dim"> / </span><span id="sellPct" class="down">--</span></div>
+    <div class="split"><i id="splitBar"></i></div>
     <div id="biasTxt" class="dim sm mt6">--</div>
   </div>
+
   <div class="card">
     <div class="lbl">ข่าวแรงสูงที่เหลือ</div>
     <div class="big" id="hiCount">--</div>
@@ -50,11 +65,13 @@
     <thead>
       <tr>
         <th>เวลา</th><th>สกุล</th><th>แรง</th><th>ข่าว</th>
-        <th>Actual</th><th>Forecast</th><th>Previous</th><th>ผลต่อทอง</th>
+        <th>Actual</th><th>Forecast</th><th>Previous</th>
+        <th>คาดก่อนข่าว<br><span class="th2">Buy / Sell</span></th>
+        <th>ผลจริง<br><span class="th2">Buy / Sell</span></th>
       </tr>
     </thead>
     <tbody id="tbody">
-      <tr><td colspan="8" class="dim">กำลังโหลด</td></tr>
+      <tr><td colspan="9" class="dim">กำลังโหลด</td></tr>
     </tbody>
   </table>
 </section>
@@ -65,8 +82,8 @@
 </section>
 
 <p class="note">
-Bias คำนวณจากส่วนต่าง Actual vs Forecast เชิงกลไกเท่านั้น ไม่ใช่คำแนะนำการลงทุน
-ตลาดจริงมีปัจจัยอื่นอีกมาก เช่น Bond Yield ภูมิรัฐศาสตร์ และแรงซื้อธนาคารกลาง
+Buy% / Sell% คำนวณเชิงกลไกจากส่วนต่างตัวเลขเศรษฐกิจเท่านั้น ไม่ใช่คำแนะนำการลงทุน
+และไม่ใช่ความน่าจะเป็นทางสถิติจริง ตลาดมีปัจจัยอื่นอีกมาก เช่น Bond Yield ภูมิรัฐศาสตร์ แรงซื้อธนาคารกลาง
 โปรดใช้ประกอบการวิเคราะห์อื่นและบริหารความเสี่ยงเสมอ
 </p>
 
