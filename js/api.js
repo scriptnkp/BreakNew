@@ -77,3 +77,4 @@ var API = (function () {
 
   return { getCalendar: getCalendar, getGold: getGold, saveCache: saveCache, loadCache: loadCache };
 })();
+
