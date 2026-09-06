@@ -5,247 +5,73 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Gold Bias Radar</title>
 <link rel="icon" href="data:,">
-<style>
-:root{--bg:#0b0e14;--card:#151a23;--line:#232a36;--txt:#e6edf3;--dim:#8b98a9;--up:#26a69a;--down:#ef5350}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--txt);font-family:Tahoma,"Segoe UI",sans-serif;padding:16px;max-width:1100px;margin:auto}
-h1{font-size:20px}
-.sub{color:var(--dim);font-size:12px;margin-bottom:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
-.lbl{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-.big{font-size:28px;font-weight:700;margin-top:4px}
-.gauge{height:10px;background:var(--line);border-radius:5px;margin-top:10px;position:relative;overflow:hidden}
-.gauge i{position:absolute;top:0;height:100%;transition:.4s}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--dim);font-size:11px;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
-tr:last-child td{border-bottom:none}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%}
-.up{color:var(--up)}.down{color:var(--down)}.dim{color:var(--dim)}
-button{background:#2a3542;color:#e6edf3;border:1px solid var(--line);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:13px}
-button:hover{background:#354354}
-.bar{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;font-size:13px}
-.bar label{cursor:pointer;user-select:none}
-.wrap{overflow-x:auto}
-.note{font-size:11px;color:var(--dim);margin-top:14px;line-height:1.7}
-</style>
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<h1>Gold Bias Radar</h1>
-<p class="sub">วิเคราะห์ทิศทางทองจากปฏิทินข่าว ForexFactory + ราคาสด</p>
+<header>
+  <h1>Gold Bias Radar</h1>
+  <p class="sub">วิเคราะห์ทิศทางทองจากปฏิทินข่าว ForexFactory + ราคาสด</p>
+</header>
 
 <div class="bar">
   <button id="btnRefresh">รีเฟรช</button>
+  <div class="seg" id="viewSeg">
+    <button data-view="today" class="on">วันนี้</button>
+    <button data-view="upcoming">ข่าวถัดไป</button>
+    <button data-view="week">ทั้งสัปดาห์</button>
+  </div>
   <label><input type="checkbox" id="onlyHigh"> เฉพาะข่าวแรงสูง</label>
   <label><input type="checkbox" id="onlyUSD" checked> เฉพาะ USD/EUR</label>
   <span id="status" class="dim"></span>
 </div>
 
-<div class="grid">
+<section class="grid">
   <div class="card">
     <div class="lbl">ราคาทอง XAU/USD</div>
     <div class="big" id="px">--</div>
-    <div id="pxSub" class="dim" style="font-size:12px">กำลังโหลด</div>
+    <div id="pxSub" class="dim sm">กำลังโหลด</div>
   </div>
   <div class="card">
-    <div class="lbl">Bias จากข่าววันนี้</div>
+    <div class="lbl">Bias จากข่าว</div>
     <div class="big" id="bias">--</div>
     <div class="gauge"><i id="gaugeBar"></i></div>
-    <div id="biasTxt" class="dim" style="font-size:12px;margin-top:6px">--</div>
+    <div id="biasTxt" class="dim sm mt6">--</div>
   </div>
   <div class="card">
-    <div class="lbl">ข่าวแรงสูงที่เหลือวันนี้</div>
+    <div class="lbl">ข่าวแรงสูงที่เหลือ</div>
     <div class="big" id="hiCount">--</div>
-    <div id="nextEv" class="dim" style="font-size:12px">--</div>
+    <div id="nextEv" class="dim sm">--</div>
   </div>
-</div>
+</section>
 
-<div class="card wrap">
-<table>
-<thead>
-<tr><th>เวลา</th><th>สกุล</th><th>แรง</th><th>ข่าว</th><th>Actual</th><th>Forecast</th><th>ผลต่อทอง</th></tr>
-</thead>
-<tbody id="tbody"><tr><td colspan="7" class="dim">กำลังโหลด</td></tr></tbody>
-</table>
-</div>
+<section class="card wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>เวลา</th><th>สกุล</th><th>แรง</th><th>ข่าว</th>
+        <th>Actual</th><th>Forecast</th><th>Previous</th><th>ผลต่อทอง</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="8" class="dim">กำลังโหลด</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <div class="lbl">Debug — สถานะการเชื่อมต่อ</div>
+  <pre id="log" class="log">รอข้อมูล...</pre>
+</section>
 
 <p class="note">
-ข้อควรทราบ: Bias คำนวณจากส่วนต่าง Actual vs Forecast เชิงกลไกเท่านั้น
-ไม่ใช่คำแนะนำการลงทุน ตลาดจริงมีปัจจัยอื่นอีกมาก เช่น Bond Yield, ภูมิรัฐศาสตร์, แรงซื้อธนาคารกลาง
+Bias คำนวณจากส่วนต่าง Actual vs Forecast เชิงกลไกเท่านั้น ไม่ใช่คำแนะนำการลงทุน
+ตลาดจริงมีปัจจัยอื่นอีกมาก เช่น Bond Yield ภูมิรัฐศาสตร์ และแรงซื้อธนาคารกลาง
 โปรดใช้ประกอบการวิเคราะห์อื่นและบริหารความเสี่ยงเสมอ
 </p>
 
-<script>
-var FF = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
-var GOLD = "https://api.gold-api.com/price/XAU";
-var INVERSE = /unemploy|jobless|claims|deficit|inventor/i;
-var W = { High: 3, Medium: 1.5, Low: 0.5, Holiday: 0 };
-var EVENTS = [];
-
-/* ถ้าทำ Cloudflare Worker แล้ว ให้เพิ่มบรรทัดนี้เป็นตัวแรกในอาเรย์
-   { name: "myworker", url: function(){ return "https://ชื่อคุณ.workers.dev"; }, wrap: false }, */
-var PROXIES = [
-  { name: "codetabs",       url: function (u) { return "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u); }, wrap: false },
-  { name: "allorigins-raw", url: function (u) { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(u); },      wrap: false },
-  { name: "allorigins-get", url: function (u) { return "https://api.allorigins.win/get?url=" + encodeURIComponent(u); },      wrap: true  },
-  { name: "corsproxy",      url: function (u) { return "https://corsproxy.io/?url=" + encodeURIComponent(u); },               wrap: false },
-  { name: "thingproxy",     url: function (u) { return "https://thingproxy.freeboard.io/fetch/" + u; },                       wrap: false }
-];
-
-function $(id) { return document.getElementById(id); }
-
-function fetchTimeout(url, ms) {
-  var ctrl = new AbortController();
-  var t = setTimeout(function () { ctrl.abort(); }, ms);
-  return fetch(url, { signal: ctrl.signal }).then(function (r) {
-    clearTimeout(t);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.text();
-  });
-}
-
-function num(s) {
-  if (s === null || s === undefined || s === "") return null;
-  var m = String(s).replace(/[,%$KMB]/gi, "").match(/-?\d+\.?\d*/);
-  return m ? parseFloat(m[0]) : null;
-}
-
-function loadAll() {
-  $("status").textContent = "กำลังดึงข้อมูล...";
-  loadGold();
-  loadCalendar();
-}
-
-function loadGold() {
-  fetchTimeout(GOLD, 8000)
-    .then(function (txt) {
-      var d = JSON.parse(txt);
-      $("px").textContent = "$" + Number(d.price).toFixed(2);
-      $("pxSub").textContent = "อัปเดต " + new Date().toLocaleTimeString("th-TH");
-    })
-    .catch(function () {
-      $("px").textContent = "N/A";
-      $("pxSub").textContent = "ดึงราคาไม่สำเร็จ";
-    });
-}
-
-function tryProxy(i) {
-  if (i >= PROXIES.length) return Promise.reject(new Error("all proxies failed"));
-  var p = PROXIES[i];
-  $("status").textContent = "กำลังลอง " + p.name + " (" + (i + 1) + "/" + PROXIES.length + ")";
-  return fetchTimeout(p.url(FF), 12000)
-    .then(function (txt) {
-      var raw = p.wrap ? JSON.parse(txt).contents : txt;
-      var data = JSON.parse(raw);
-      if (!data || !data.length) throw new Error("empty");
-      return { data: data, via: p.name };
-    })
-    .catch(function (e) {
-      console.warn("proxy fail:", p.name, e.message);
-      return tryProxy(i + 1);
-    });
-}
-
-function loadCalendar() {
-  tryProxy(0)
-    .then(function (res) {
-      EVENTS = res.data;
-      $("status").textContent = "อัปเดต " + new Date().toLocaleTimeString("th-TH") + " (via " + res.via + ")";
-      render();
-    })
-    .catch(function () {
-      $("tbody").innerHTML = '<tr><td colspan="7" class="down">proxy ทุกตัวใช้ไม่ได้ ลองรีเฟรชอีกครั้ง หรือทำ Cloudflare Worker เอง</td></tr>';
-      $("status").textContent = "ผิดพลาด";
-    });
-}
-
-function scoreEvent(ev) {
-  var a = num(ev.actual);
-  var f = num(ev.forecast);
-  if (f === null) f = num(ev.previous);
-  if (a === null || f === null) return null;
-  var diff = a - f;
-  if (INVERSE.test(ev.title)) diff = -diff;
-  var surprise = Math.max(-1, Math.min(1, (diff / (Math.abs(f) || 1)) * 3));
-  var dir = 0;
-  if (ev.country === "USD") dir = -1;
-  else if (["EUR", "GBP", "CHF"].indexOf(ev.country) >= 0) dir = 0.4;
-  var w = W[ev.impact];
-  if (w === undefined) w = 1;
-  return surprise * dir * w;
-}
-
-function render() {
-  var hiOnly = $("onlyHigh").checked;
-  var usdOnly = $("onlyUSD").checked;
-  var today = new Date().toDateString();
-  var colors = { High: "#ef5350", Medium: "#ffa726", Low: "#ffd54f", Holiday: "#8b98a9" };
-
-  var rows = EVENTS.filter(function (e) { return new Date(e.date).toDateString() === today; });
-  if (hiOnly) rows = rows.filter(function (e) { return e.impact === "High"; });
-  if (usdOnly) rows = rows.filter(function (e) { return e.country === "USD" || e.country === "EUR"; });
-
-  var total = 0, counted = 0, html = "";
-  rows.forEach(function (ev) {
-    var s = scoreEvent(ev);
-    if (s !== null) { total += s; counted++; }
-    var t = new Date(ev.date).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-    var c = colors[ev.impact] || "#8b98a9";
-    var eff = '<span class="dim">รอผล</span>';
-    if (s !== null) {
-      if (s > 0.15) eff = '<span class="up">UP หนุนทอง</span>';
-      else if (s < -0.15) eff = '<span class="down">DOWN กดทอง</span>';
-      else eff = '<span class="dim">กลาง</span>';
-    }
-    html += "<tr><td class='dim'>" + t +
-      "</td><td><b>" + ev.country +
-      "</b></td><td><span class='dot' style='background:" + c + "'></span></td><td>" + ev.title +
-      "</td><td><b>" + (ev.actual || "-") +
-      "</b></td><td class='dim'>" + (ev.forecast || "-") +
-      "</td><td>" + eff + "</td></tr>";
-  });
-
-  $("tbody").innerHTML = html || '<tr><td colspan="7" class="dim">ไม่มีข่าวตามเงื่อนไข</td></tr>';
-
-  var pct = counted ? Math.round((total / counted) * 100) : 0;
-  pct = Math.max(-100, Math.min(100, pct));
-  var el = $("bias"), bar = $("gaugeBar");
-  if (!counted) {
-    el.textContent = "รอข่าว";
-    el.className = "big dim";
-    $("biasTxt").textContent = "ยังไม่มี Actual ออกวันนี้";
-    bar.style.width = "0";
-  } else {
-    el.textContent = pct > 25 ? "ขาขึ้น" : pct < -25 ? "ขาลง" : "ไซด์เวย์";
-    el.className = "big " + (pct > 25 ? "up" : pct < -25 ? "down" : "");
-    $("biasTxt").textContent = "คะแนน " + pct + " จาก " + counted + " ข่าว";
-    bar.style.width = Math.abs(pct) / 2 + "%";
-    bar.style.left = pct >= 0 ? "50%" : (50 - Math.abs(pct) / 2) + "%";
-    bar.style.background = pct >= 0 ? "#26a69a" : "#ef5350";
-  }
-
-  var now = Date.now();
-  var pending = EVENTS.filter(function (e) {
-    return e.impact === "High" &&
-      (e.country === "USD" || e.country === "EUR") &&
-      new Date(e.date).toDateString() === today &&
-      new Date(e.date).getTime() > now;
-  });
-  $("hiCount").textContent = pending.length;
-  $("nextEv").textContent = pending.length
-    ? "ถัดไป " + pending[0].title + " เวลา " +
-      new Date(pending[0].date).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
-    : "ไม่มีข่าวแรงสูงเหลือแล้ว";
-}
-
-$("btnRefresh").addEventListener("click", loadAll);
-$("onlyHigh").addEventListener("change", render);
-$("onlyUSD").addEventListener("change", render);
-loadAll();
-setInterval(loadAll, 120000);
-</script>
-
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
