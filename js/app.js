@@ -2,10 +2,13 @@
 (function () {
 
   var EVENTS = [];
-  var F = { view: "today", imp: "all", ccy: "usdeur" };
+  var F = { view: "today", imp: "all", ccy: "usdeur", q: "" };
+  var OPEN = {};
   var LOGS = [];
 
   function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
   function log(msg) {
     LOGS.unshift("[" + new Date().toLocaleTimeString("th-TH") + "] " + msg);
@@ -13,7 +16,6 @@
     $("log").textContent = LOGS.join("\n");
   }
 
-  /* ---------- แปลงตัวเลข รองรับ K M B % ---------- */
   function num(s) {
     if (s === null || s === undefined || s === "") return null;
     var str = String(s);
@@ -26,17 +28,15 @@
     return v;
   }
 
-  /* ---------- normalize ตั้งแต่ตอนโหลด แก้ปัญหาตัวกรองหลุด ---------- */
   function normalize(list) {
     var out = [];
     for (var i = 0; i < list.length; i++) {
-      var e = list[i];
-      var d = new Date(e.date);
+      var e = list[i], d = new Date(e.date);
       if (isNaN(d.getTime())) continue;
-      e._d = d;
-      e._t = d.getTime();
+      e._d = d; e._t = d.getTime();
       e._imp = String(e.impact || "").trim().toLowerCase();
       e._cc = String(e.country || "").trim().toUpperCase();
+      e._q = String(e.title || "").toLowerCase();
       out.push(e);
     }
     out.sort(function (a, b) { return a._t - b._t; });
@@ -45,109 +45,117 @@
 
   function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
 
-  /* ---------- คะแนน -1..+1 (บวก = หนุนทอง) ---------- */
   function lean(cur, ref, ev) {
     if (cur === null || ref === null) return null;
     var dir = CCY_DIR[ev._cc];
     if (dir === undefined) return null;
-    var w = WEIGHT[ev._imp];
-    if (w === undefined) w = 1;
+    var w = WEIGHT[ev._imp]; if (w === undefined) w = 1;
     if (w === 0) return null;
-
     var diff = cur - ref;
     if (INVERSE_RE.test(ev.title || "")) diff = -diff;
-
     var base = Math.abs(ref) || Math.abs(cur) || 1;
-    var surprise = Math.max(-1, Math.min(1, (diff / base) * CONFIG.SENSITIVITY));
-    return Math.max(-1, Math.min(1, surprise * dir * (w / 3)));
+    var sp = Math.max(-1, Math.min(1, (diff / base) * CONFIG.SENSITIVITY));
+    return Math.max(-1, Math.min(1, sp * dir * (w / 3)));
   }
 
-  function preLean(ev)  { return lean(num(ev.forecast), num(ev.previous), ev); }
+  function preLean(ev) { return lean(num(ev.forecast), num(ev.previous), ev); }
   function postLean(ev) {
-    var f = num(ev.forecast);
-    if (f === null) f = num(ev.previous);
+    var f = num(ev.forecast); if (f === null) f = num(ev.previous);
     return lean(num(ev.actual), f, ev);
   }
+  function toBuyPct(s) { return Math.round(50 + s * 50); }
 
-  function toBuyPct(score) { return Math.round(50 + score * 50); }
-
-  function pctCell(score) {
-    if (score === null) return '<span class="dim">-</span>';
-    var b = toBuyPct(score), s = 100 - b;
-    var cls = b > 55 ? "up" : b < 45 ? "down" : "dim";
-    return '<div class="pw"><div class="pb"><i style="width:' + b + '%"></i></div>' +
-           '<div class="pt ' + cls + '">B ' + b + '% / S ' + s + '%</div></div>';
+  function barRow(key, score) {
+    if (score === null) return '<div class="bl"><span class="k">' + key + '</span>' +
+      '<div class="pb" style="background:var(--line)"></div><span class="pt dim">-</span></div>';
+    var b = toBuyPct(score), cls = b > 55 ? "up" : b < 45 ? "down" : "dim";
+    return '<div class="bl"><span class="k">' + key + '</span>' +
+      '<div class="pb"><i style="width:' + b + '%"></i></div>' +
+      '<span class="pt ' + cls + '">' + b + " / " + (100 - b) + "</span></div>";
   }
 
-  /* ---------- กรอง ---------- */
-  function filterEvents() {
-    var now = new Date();
-    var rows = EVENTS;
+  var IMP_TH = { high: "แรงสูง", medium: "แรงกลาง", low: "แรงต่ำ", holiday: "วันหยุด" };
 
-    if (F.view === "today")      rows = rows.filter(function (e) { return sameDay(e._d, now); });
+  function filterEvents() {
+    var now = new Date(), rows = EVENTS;
+    if (F.view === "today") rows = rows.filter(function (e) { return sameDay(e._d, now); });
     else if (F.view === "upcoming") rows = rows.filter(function (e) { return e._t >= now.getTime(); });
 
-    if (F.imp === "high")         rows = rows.filter(function (e) { return e._imp === "high"; });
+    if (F.imp === "high") rows = rows.filter(function (e) { return e._imp === "high"; });
     else if (F.imp === "highmed") rows = rows.filter(function (e) { return e._imp === "high" || e._imp === "medium"; });
 
-    if (F.ccy === "usd")          rows = rows.filter(function (e) { return e._cc === "USD"; });
-    else if (F.ccy === "usdeur")  rows = rows.filter(function (e) { return e._cc === "USD" || e._cc === "EUR"; });
+    if (F.ccy === "usd") rows = rows.filter(function (e) { return e._cc === "USD"; });
+    else if (F.ccy === "usdeur") rows = rows.filter(function (e) { return e._cc === "USD" || e._cc === "EUR"; });
 
+    if (F.q) rows = rows.filter(function (e) { return e._q.indexOf(F.q) > -1; });
     return rows;
   }
 
-  /* ---------- ตาราง ---------- */
-  function renderTable(rows) {
-    $("count").textContent = "แสดง " + rows.length + " / " + EVENTS.length + " รายการ";
+  function renderList(rows) {
+    $("count").textContent = "แสดง " + rows.length + " / " + EVENTS.length;
 
     if (!rows.length) {
-      $("tbody").innerHTML = '<tr><td colspan="9" class="dim">ไม่มีข่าวตามเงื่อนไข ลองกด "ทั้งสัปดาห์" หรือ "ทุกความแรง"</td></tr>';
+      $("list").innerHTML = '<div class="card empty">ไม่พบข่าวตามเงื่อนไข<br><span class="sm">ลองกด "ทั้งสัปดาห์" หรือ "ทุกแรง"</span></div>';
       return;
     }
+
     var html = "", lastDay = "";
     for (var i = 0; i < rows.length; i++) {
       var ev = rows[i];
       var key = ev._d.toDateString();
       if (key !== lastDay) {
         lastDay = key;
-        html += '<tr class="day"><td colspan="9">' +
-          ev._d.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "short" }) + "</td></tr>";
+        html += '<div class="dayhead">' + ev._d.toLocaleDateString("th-TH",
+          { weekday: "long", day: "numeric", month: "long" }) + "</div>";
       }
-      html += "<tr>" +
-        '<td class="dim">' + ev._d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + "</td>" +
-        "<td><b>" + ev._cc + "</b></td>" +
-        '<td><span class="dot" style="background:' + (IMPACT_COLOR[ev._imp] || "#8b98a9") + '"></span></td>' +
-        "<td>" + (ev.title || "-") + "</td>" +
-        "<td><b>" + (ev.actual || "-") + "</b></td>" +
-        '<td class="dim">' + (ev.forecast || "-") + "</td>" +
-        '<td class="dim">' + (ev.previous || "-") + "</td>" +
-        "<td>" + pctCell(preLean(ev)) + "</td>" +
-        "<td>" + pctCell(postLean(ev)) + "</td></tr>";
+
+      var g = explain(ev.title);
+      var id = ev._t + "_" + i;
+      var side = ev._imp === "high" ? " hi" : ev._imp === "medium" ? " me" : "";
+      var open = OPEN[id] ? " open" : "";
+
+      html += '<article class="ev' + side + open + '" data-id="' + id + '">' +
+        '<div class="ev-top">' +
+          '<span class="time">' + ev._d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + "</span>" +
+          '<span class="ccy">' + esc(ev._cc) + "</span>" +
+          '<span class="imp i-' + (ev._imp || "low") + '">' + (IMP_TH[ev._imp] || "-") + "</span>" +
+        "</div>" +
+
+        '<h3 class="ev-title">' + esc(ev.title) + '<span class="chev">▼</span></h3>' +
+
+        '<div class="vals">' +
+          '<div class="v"><b>Actual</b><span>' + esc(ev.actual || "-") + "</span></div>" +
+          '<div class="v"><b>Forecast</b><span class="dim">' + esc(ev.forecast || "-") + "</span></div>" +
+          '<div class="v"><b>Previous</b><span class="dim">' + esc(ev.previous || "-") + "</span></div>" +
+        "</div>" +
+
+        '<div class="bias">' + barRow("คาดก่อน", preLean(ev)) + barRow("ผลจริง", postLean(ev)) + "</div>" +
+
+        '<div class="ev-more">' +
+          '<div><div class="exp"><h4>📌 ข่าวนี้คืออะไร</h4><p>' + esc(g.n) + " — " + esc(g.w) + "</p></div></div>" +
+          '<div><div class="exp"><h4>🥇 ผลต่อราคาทอง</h4><p>' + esc(g.g) + "</p></div></div>" +
+        "</div></article>";
     }
-    $("tbody").innerHTML = html;
+    $("list").innerHTML = html;
   }
 
-  /* ---------- การ์ดสรุป ---------- */
   function renderSummary(rows) {
     var pre = 0, preN = 0, post = 0, postN = 0;
     for (var i = 0; i < rows.length; i++) {
       var w = WEIGHT[rows[i]._imp] || 1;
-      var a = preLean(rows[i]);
-      var b = postLean(rows[i]);
+      var a = preLean(rows[i]), b = postLean(rows[i]);
       if (a !== null) { pre += a * w; preN += w; }
       if (b !== null) { post += b * w; postN += w; }
     }
     var score = null, label = "";
     if (postN > 0) { score = post / postN; label = "อิงผลจริงที่ออกแล้ว"; }
-    else if (preN > 0) { score = pre / preN; label = "อิงคาดการณ์ก่อนข่าว (Forecast vs Previous)"; }
+    else if (preN > 0) { score = pre / preN; label = "อิงคาดการณ์ก่อนข่าว"; }
 
     var bar = $("splitBar");
     if (score === null) {
-      $("buyPct").textContent = "--";
-      $("sellPct").textContent = "--";
+      $("buyPct").textContent = "--"; $("sellPct").textContent = "--";
       $("biasTxt").textContent = "ไม่มีตัวเลขให้คำนวณในช่วงที่เลือก";
-      bar.style.width = "50%";
-      return;
+      bar.style.width = "50%"; return;
     }
     var b = toBuyPct(score);
     $("buyPct").textContent = "B " + b + "%";
@@ -159,54 +167,48 @@
 
   function renderNext() {
     var now = Date.now();
-    var pending = EVENTS.filter(function (e) {
+    var p = EVENTS.filter(function (e) {
       return e._imp === "high" && CCY_DIR[e._cc] !== undefined && e._t > now;
     });
-    $("hiCount").textContent = pending.length;
-    if (!pending.length) { $("nextEv").textContent = "ไม่มีข่าวแรงสูงเหลือในสัปดาห์นี้"; return; }
-    var d = pending[0]._d;
-    var hrs = Math.round((d.getTime() - now) / 3600000);
-    $("nextEv").textContent = pending[0].title + " • " +
-      d.toLocaleString("th-TH", { weekday: "short", hour: "2-digit", minute: "2-digit" }) +
-      " (อีก ~" + hrs + " ชม.)";
+    $("hiCount").textContent = p.length;
+    if (!p.length) { $("nextEv").textContent = "ไม่มีข่าวแรงสูงเหลือสัปดาห์นี้"; return; }
+    var d = p[0]._d, hrs = Math.round((d.getTime() - now) / 3600000);
+    $("nextEv").textContent = p[0].title + " • อีก ~" + hrs + " ชม.";
   }
 
   function render() {
     var rows = filterEvents();
-    renderTable(rows);
-    renderSummary(rows);
-    renderNext();
+    renderList(rows); renderSummary(rows); renderNext();
   }
 
-  /* ---------- โหลดข้อมูล ---------- */
+  /* ---------- โหลด ---------- */
   function loadGold() {
-    API.getGold()
-      .then(function (d) {
-        $("px").textContent = "$" + Number(d.price).toFixed(2);
-        $("pxSub").textContent = "อัปเดต " + new Date().toLocaleTimeString("th-TH");
-      })
-      .catch(function (e) {
-        $("px").textContent = "N/A";
-        $("pxSub").textContent = "ดึงราคาไม่สำเร็จ";
-        log("ราคาทองล้มเหลว: " + e.message);
-      });
+    API.getGold().then(function (d) {
+      $("px").textContent = "$" + Number(d.price).toFixed(2);
+      $("pxSub").textContent = "อัปเดต " + new Date().toLocaleTimeString("th-TH");
+    }).catch(function (e) {
+      $("px").textContent = "N/A";
+      $("pxSub").textContent = "ดึงราคาไม่สำเร็จ";
+      log("ราคาทองล้มเหลว: " + e.message);
+    });
   }
 
   function afterLoad(via) {
     API.saveCache(EVENTS);
     $("status").textContent = "• " + new Date().toLocaleTimeString("th-TH") + " " + via;
-
     if (F.view === "today") {
-      var today = new Date();
-      var has = EVENTS.some(function (e) { return sameDay(e._d, today); });
-      if (!has) { log('วันนี้ไม่มีข่าว → สลับไปโหมด "ข่าวถัดไป"'); setSeg("view", "upcoming"); return; }
+      var t = new Date();
+      if (!EVENTS.some(function (e) { return sameDay(e._d, t); })) {
+        log('วันนี้ไม่มีข่าว → สลับไปโหมด "ถัดไป"');
+        setSeg("view", "upcoming"); return;
+      }
     }
     render();
   }
 
   function loadCalendar() {
     API.getCalendar(log)
-      .then(function (res) { EVENTS = normalize(res.data); afterLoad("via " + res.via); })
+      .then(function (r) { EVENTS = normalize(r.data); afterLoad("via " + r.via); })
       .catch(function (e) {
         log("✗✗ " + e.message);
         var c = API.loadCache();
@@ -215,25 +217,23 @@
           log("ใช้แคชจาก " + new Date(c.t).toLocaleString("th-TH"));
           afterLoad("แคช");
         } else {
-          $("tbody").innerHTML = '<tr><td colspan="9" class="down">ดึงปฏิทินไม่ได้ — แนะนำตั้ง Cloudflare Worker แล้วใส่ URL ใน js/config.js</td></tr>';
+          $("list").innerHTML = '<div class="card empty down">ดึงปฏิทินไม่ได้ — ตรวจว่า GitHub Actions รันแล้วหรือยัง</div>';
           $("status").textContent = "ผิดพลาด";
         }
       });
   }
 
   function loadAll() {
-    $("status").textContent = "กำลังดึงข้อมูล...";
-    loadGold();
-    loadCalendar();
+    $("status").textContent = "กำลังโหลด...";
+    loadGold(); loadCalendar();
   }
 
-  /* ---------- ปุ่มกรอง ---------- */
+  /* ---------- events ---------- */
   function setSeg(group, val) {
     F[group] = val;
-    var boxes = document.querySelectorAll('.seg[data-group="' + group + '"] button');
-    for (var i = 0; i < boxes.length; i++) {
-      boxes[i].className = boxes[i].getAttribute("data-v") === val ? "on" : "";
-    }
+    var b = document.querySelectorAll('.seg[data-group="' + group + '"] button');
+    for (var i = 0; i < b.length; i++)
+      b[i].className = b[i].getAttribute("data-v") === val ? "on" : "";
     render();
   }
 
@@ -246,6 +246,32 @@
       });
     })(segs[i]);
   }
+
+  $("list").addEventListener("click", function (e) {
+    var card = e.target.closest(".ev");
+    if (!card) return;
+    var id = card.getAttribute("data-id");
+    if (OPEN[id]) { delete OPEN[id]; card.classList.remove("open"); }
+    else { OPEN[id] = 1; card.classList.add("open"); }
+  });
+
+  var qt;
+  $("q").addEventListener("input", function (e) {
+    clearTimeout(qt);
+    var v = e.target.value.trim().toLowerCase();
+    qt = setTimeout(function () { F.q = v; render(); }, 220);
+  });
+
+  var root = document.documentElement;
+  var saved = localStorage.getItem("gbr_theme");
+  if (saved) root.setAttribute("data-theme", saved);
+  $("btnTheme").textContent = root.getAttribute("data-theme") === "light" ? "☀️" : "🌙";
+  $("btnTheme").addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+    root.setAttribute("data-theme", next);
+    localStorage.setItem("gbr_theme", next);
+    this.textContent = next === "light" ? "☀️" : "🌙";
+  });
 
   $("btnRefresh").addEventListener("click", loadAll);
 
