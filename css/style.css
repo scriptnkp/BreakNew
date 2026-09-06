@@ -6,7 +6,7 @@
 body{
   background:var(--bg);color:var(--txt);
   font-family:Tahoma,"Segoe UI",sans-serif;
-  padding:16px;max-width:1150px;margin:auto;
+  padding:16px;max-width:1250px;margin:auto;
 }
 header{margin-bottom:14px}
 h1{font-size:20px}
@@ -14,8 +14,7 @@ h1{font-size:20px}
 .sm{font-size:12px}
 .mt6{margin-top:6px}
 
-.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;margin-bottom:14px}
-.bar label{cursor:pointer;user-select:none}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;margin-bottom:14px}
 button{
   background:#2a3542;color:var(--txt);border:1px solid var(--line);
   padding:8px 14px;border-radius:8px;cursor:pointer;
@@ -30,16 +29,18 @@ button:hover{background:#354354}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
 .lbl{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .big{font-size:28px;font-weight:700;margin-top:4px}
-.gauge{height:10px;background:var(--line);border-radius:5px;margin-top:10px;position:relative;overflow:hidden}
-.gauge i{position:absolute;top:0;height:100%;width:0;transition:.4s}
+
+.split{height:12px;background:var(--down);border-radius:6px;margin-top:10px;overflow:hidden}
+.split i{display:block;height:100%;width:50%;background:var(--up);transition:.4s}
 
 .wrap{overflow-x:auto;padding:0}
-table{width:100%;border-collapse:collapse;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
 th{
   text-align:left;color:var(--dim);font-size:11px;padding:10px 8px;
   border-bottom:1px solid var(--line);white-space:nowrap;
   position:sticky;top:0;background:var(--card);
 }
+.th2{font-size:10px;opacity:.7;font-weight:400}
 td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tbody tr:hover{background:#1b2230}
@@ -48,6 +49,11 @@ tbody tr:hover{background:#1b2230}
 .down{color:var(--down)}
 .dim{color:var(--dim)}
 .day{background:#1a212c;font-size:11px;color:var(--dim);letter-spacing:.5px}
+
+.pw{min-width:96px}
+.pb{height:6px;background:var(--down);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.pb i{display:block;height:100%;background:var(--up)}
+.pt{font-size:11px;white-space:nowrap}
 
 .log{
   font-family:Consolas,monospace;font-size:11px;color:var(--dim);
@@ -59,5 +65,5 @@ tbody tr:hover{background:#1b2230}
 @media(max-width:600px){
   body{padding:10px}
   .big{font-size:22px}
-  .bar{gap:8px}
+  .seg button{padding:7px 10px;font-size:12px}
 }
