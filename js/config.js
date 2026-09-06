@@ -1,13 +1,14 @@
 /* ===== ตั้งค่าทั้งหมดอยู่ที่นี่ ===== */
 var CONFIG = {
+  LOCAL_URL: "data/calendar.json",   // ★ ไฟล์ที่ GitHub Actions สร้างให้
   FF_URL: "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
   GOLD_URL: "https://api.gold-api.com/price/XAU",
-  MY_WORKER: "",            // ใส่ URL Cloudflare Worker ถ้ามี จะถูกใช้เป็นตัวแรก
+  MY_WORKER: "",
   PROXY_TIMEOUT: 10000,
   GOLD_TIMEOUT: 8000,
   REFRESH_MS: 180000,
   CACHE_KEY: "gbr_cache_v2",
-  SENSITIVITY: 3            // ยิ่งสูง ยิ่งแกว่ง % แรง
+  SENSITIVITY: 3
 };
 
 var PROXIES = [
