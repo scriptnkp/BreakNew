@@ -1,0 +1,66 @@
+name: Fetch FF Calendar
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download calendar
+        run: |
+          mkdir -p data
+
+          get () {
+            curl -sSL --max-time 30 \
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+              -H "Accept: application/json" \
+              "$1" -o "$2"
+            if [ $? -ne 0 ]; then echo "curl fail"; return 1; fi
+            if head -c 400 "$2" | grep -qi "doctype\|Request Denied"; then
+              echo "rate limited"; return 1
+            fi
+            if ! jq -e 'type=="array" and length>0' "$2" >/dev/null 2>&1; then
+              echo "bad json"; return 1
+            fi
+            return 0
+          }
+
+          ok=0
+          for u in \
+            "https://nfs.faireconomy.media/ff_calendar_thisweek.json" \
+            "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json"
+          do
+            echo "try $u"
+            if get "$u" this.json; then ok=1; break; fi
+            sleep 15
+          done
+
+          if [ "$ok" = "0" ]; then
+            echo "::warning::ดึงข้อมูลไม่สำเร็จ คงไฟล์เดิมไว้"
+            exit 0
+          fi
+
+          if get "https://nfs.faireconomy.media/ff_calendar_nextweek.json" next.json; then
+            jq -s 'add' this.json next.json > data/calendar.json
+          else
+            cp this.json data/calendar.json
+          fi
+
+          echo "{\"updated\":\"$(date -u +%FT%TZ)\",\"count\":$(jq 'length' data/calendar.json)}" > data/meta.json
+          echo "saved $(jq 'length' data/calendar.json) events"
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --staged --quiet || git commit -m "calendar $(date -u +%FT%TZ)"
+          git push
