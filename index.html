@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a0d14">
-<title>Market Radar — ข่าวทอง & Scan หุ้น</title>
+<title>Market Radar — ข่าวทอง & Scan สินทรัพย์</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -24,36 +24,29 @@
   </div>
 </header>
 
-<!-- ===== เมนูหลัก ===== -->
 <nav class="tabs" id="tabs">
   <button class="tab on" data-page="gold">
-    <span class="ti">🥇</span>
-    <span class="tl">ข่าวทอง</span>
-    <span class="td">Gold Bias Radar</span>
+    <span class="ti">🥇</span><span class="tl">ข่าวทอง</span><span class="td">Gold Bias Radar</span>
   </button>
   <button class="tab" data-page="scan">
-    <span class="ti">📊</span>
-    <span class="tl">Scan หุ้น</span>
-    <span class="td">Global Asset Scanner</span>
+    <span class="ti">📊</span><span class="tl">Scan สินทรัพย์</span><span class="td">Global Scanner</span>
   </button>
 </nav>
 
-<!-- ===================== PAGE : GOLD ===================== -->
+<!-- ================= GOLD ================= -->
 <div id="pgGold" class="page on">
-
   <section class="stats">
     <div class="card stat">
       <div class="lbl">ราคาทอง XAU/USD</div>
       <div class="big" id="px">--</div>
       <div id="pxSub" class="dim sm">กำลังโหลด</div>
     </div>
-
     <div class="card stat">
       <div class="lbl">สรุปข่าวตามความแรง — กดเพื่อกรอง</div>
       <div class="chips" id="chips">
-        <button class="chip c-high"   data-imp="high"><b id="nHigh">0</b><span>แรงสูง</span></button>
+        <button class="chip c-high" data-imp="high"><b id="nHigh">0</b><span>แรงสูง</span></button>
         <button class="chip c-medium" data-imp="medium"><b id="nMed">0</b><span>แรงกลาง</span></button>
-        <button class="chip c-low"    data-imp="low"><b id="nLow">0</b><span>แรงต่ำ</span></button>
+        <button class="chip c-low" data-imp="low"><b id="nLow">0</b><span>แรงต่ำ</span></button>
       </div>
       <div class="minibias">
         <div class="split"><i id="splitBar"></i></div>
@@ -63,7 +56,6 @@
         </div>
       </div>
     </div>
-
     <div class="card stat">
       <div class="lbl">ข่าวแรงสูงที่เหลือ</div>
       <div class="big" id="hiCount">--</div>
@@ -100,9 +92,7 @@
     <span>เวลา / สกุล</span><span>ข่าว</span><span>Actual / Forecast / Prev</span><span>คาดก่อนข่าว / ผลจริง</span>
   </section>
 
-  <main id="list" class="list">
-    <div class="card empty">กำลังโหลด...</div>
-  </main>
+  <main id="list" class="list"><div class="card empty">กำลังโหลด...</div></main>
 
   <details class="card dbg">
     <summary>Debug — สถานะการเชื่อมต่อ</summary>
@@ -110,17 +100,17 @@
   </details>
 </div>
 
+<!-- ================= SCAN ================= -->
 <div id="pgScan" class="page" data-grp="th">
-
   <section class="scanhero card">
     <div class="shleft">
       <div class="lbl">Asset Scanner</div>
       <h2 class="h2">Top 10 Gainers / Losers</h2>
-      <p class="dim sm">5 กลุ่มสินทรัพย์ × 4 กรอบเวลา — จัดอันดับอัตโนมัติ</p>
+      <p class="dim sm">7 กลุ่มสินทรัพย์ × 4 กรอบเวลา + สัญญาณเทคนิค</p>
     </div>
     <div class="scanmeta">
       <div class="mtile m1"><b id="sUpd">--</b><span>อัปเดตล่าสุด</span></div>
-      <div class="mtile m2"><b id="sCnt">--</b><span>สินทรัพย์ทั้งหมด</span></div>
+      <div class="mtile m2"><b id="sCnt">--</b><span>สินทรัพย์</span></div>
       <div class="mtile m3"><b id="sUp">--</b><span>บวก</span></div>
       <div class="mtile m4"><b id="sDn">--</b><span>ลบ</span></div>
     </div>
@@ -131,6 +121,8 @@
       <div class="seg segc" data-sgroup="grp">
         <button data-v="th" class="on"><span class="gi">🇹🇭</span>หุ้นไทย</button>
         <button data-v="global"><span class="gi">🌍</span>หุ้นต่างประเทศ</button>
+        <button data-v="energy"><span class="gi">⚡</span>พลังงาน</button>
+        <button data-v="crypto"><span class="gi">₿</span>คริปโต</button>
         <button data-v="commodities"><span class="gi">🛢️</span>โภคภัณฑ์</button>
         <button data-v="currencies"><span class="gi">💱</span>สกุลเงิน</button>
         <button data-v="aifunds"><span class="gi">🤖</span>กองทุน AI</button>
@@ -148,20 +140,29 @@
       </div>
     </div>
     <div class="srow">
-      <input id="sq" type="search" placeholder="ค้นหาชื่อ / สัญลักษณ์ เช่น PTT, NVDA">
+      <input id="sq" type="search" placeholder="ค้นหาชื่อ / สัญลักษณ์ เช่น PTT, NVDA, BTC">
       <span id="sStatus" class="dim sm"></span>
     </div>
   </nav>
 
-  <div id="scanBody">
-    <div class="card empty">กำลังโหลดข้อมูลสแกน...</div>
+  <div id="scanBody"><div class="card empty">กำลังโหลดข้อมูลสแกน...</div></div>
+
+  <div class="card legend">
+    <div class="lbl">คำอธิบายสัญญาณเทคนิค</div>
+    <div class="lgrid">
+      <div><span class="bdg b-ob">RSI &gt; 70</span> ซื้อมากเกินไป เสี่ยงย่อตัว</div>
+      <div><span class="bdg b-os">RSI &lt; 30</span> ขายมากเกินไป อาจเด้งกลับ</div>
+      <div><span class="bdg b-gc">Golden Cross</span> MA50 อยู่เหนือ MA200 = แนวโน้มขาขึ้น</div>
+      <div><span class="bdg b-dc">Death Cross</span> MA50 ต่ำกว่า MA200 = แนวโน้มขาลง</div>
+      <div><span class="bdg b-vs">Vol Spike</span> ปริมาณซื้อขายเกิน 2 เท่าค่าเฉลี่ย 20 วัน</div>
+    </div>
   </div>
 </div>
 
 <p class="note">
-ข้อมูลทั้งหมดเพื่อการศึกษาและติดตามตลาดเท่านั้น ไม่ใช่คำแนะนำการลงทุน
+ข้อมูลเพื่อการศึกษาและติดตามตลาดเท่านั้น ไม่ใช่คำแนะนำการลงทุน
 ราคาอาจล่าช้าจากตลาดจริง ผลตอบแทนย้อนหลังไม่รับประกันผลในอนาคต
-โปรดตรวจสอบข้อมูลจากแหล่งทางการและบริหารความเสี่ยงเสมอ
+สัญญาณเทคนิคเป็นเพียงเครื่องมือประกอบ ควรตรวจสอบข้อมูลจากแหล่งทางการและบริหารความเสี่ยงเสมอ
 </p>
 
 <script src="js/config.js"></script>
