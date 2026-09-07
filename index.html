@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a0d14">
-<title>Gold Bias Radar</title>
+<title>Market Radar — ข่าวทอง & Scan หุ้น</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -12,10 +12,10 @@
 
 <header class="hd">
   <div class="brand">
-    <div class="logo">Au</div>
+    <div class="logo">MR</div>
     <div>
-      <h1>Gold Bias Radar</h1>
-      <p class="sub">วิเคราะห์ทิศทางทองจากปฏิทินข่าว + ราคาสด</p>
+      <h1>Market Radar</h1>
+      <p class="sub">ปฏิทินข่าว + สแกนสินทรัพย์ทั่วโลก</p>
     </div>
   </div>
   <div class="hd-act">
@@ -24,85 +24,148 @@
   </div>
 </header>
 
-<section class="stats">
-
-  <div class="card stat">
-    <div class="lbl">ราคาทอง XAU/USD</div>
-    <div class="big" id="px">--</div>
-    <div id="pxSub" class="dim sm">กำลังโหลด</div>
-  </div>
-
-  <div class="card stat">
-    <div class="lbl">สรุปข่าวตามความแรง — กดเพื่อกรอง</div>
-    <div class="chips" id="chips">
-      <button class="chip c-high"   data-imp="high"><b id="nHigh">0</b><span>แรงสูง</span></button>
-      <button class="chip c-medium" data-imp="medium"><b id="nMed">0</b><span>แรงกลาง</span></button>
-      <button class="chip c-low"    data-imp="low"><b id="nLow">0</b><span>แรงต่ำ</span></button>
-    </div>
-    <div class="minibias">
-      <div class="split"><i id="splitBar"></i></div>
-      <div class="mbtxt">
-        <span><span id="buyPct" class="up">--</span><span class="dim slash">/</span><span id="sellPct" class="down">--</span></span>
-        <span id="biasTxt" class="dim">--</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="card stat">
-    <div class="lbl">ข่าวแรงสูงที่เหลือ</div>
-    <div class="big" id="hiCount">--</div>
-    <div id="nextEv" class="dim sm">--</div>
-  </div>
-
-</section>
-
-<nav class="bar">
-  <div class="segrow">
-    <div class="seg" data-group="view">
-      <button data-v="today" class="on">วันนี้</button>
-      <button data-v="upcoming">ถัดไป</button>
-      <button data-v="week">ทั้งสัปดาห์</button>
-    </div>
-    <div class="seg" data-group="imp">
-      <button data-v="all" class="on">ทุกแรง</button>
-      <button data-v="high">สูง</button>
-      <button data-v="highmed">สูง+กลาง</button>
-    </div>
-    <div class="seg" data-group="ccy">
-      <button data-v="all">ทุกสกุล</button>
-      <button data-v="usd">USD</button>
-      <button data-v="usdeur" class="on">USD+EUR</button>
-    </div>
-  </div>
-  <div class="srow">
-    <input id="q" type="search" placeholder="ค้นหาชื่อข่าว เช่น CPI, NFP">
-    <span id="count" class="dim sm"></span>
-    <span id="status" class="dim sm"></span>
-  </div>
+<!-- ===== เมนูหลัก ===== -->
+<nav class="tabs" id="tabs">
+  <button class="tab on" data-page="gold">
+    <span class="ti">🥇</span>
+    <span class="tl">ข่าวทอง</span>
+    <span class="td">Gold Bias Radar</span>
+  </button>
+  <button class="tab" data-page="scan">
+    <span class="ti">📊</span>
+    <span class="tl">Scan หุ้น</span>
+    <span class="td">Global Asset Scanner</span>
+  </button>
 </nav>
 
-<section class="hdrow card">
-  <span>เวลา / สกุล</span><span>ข่าว</span><span>Actual / Forecast / Prev</span><span>คาดก่อนข่าว / ผลจริง</span>
-</section>
+<!-- ===================== PAGE : GOLD ===================== -->
+<div id="pgGold" class="page on">
 
-<main id="list" class="list">
-  <div class="card empty">กำลังโหลด...</div>
-</main>
+  <section class="stats">
+    <div class="card stat">
+      <div class="lbl">ราคาทอง XAU/USD</div>
+      <div class="big" id="px">--</div>
+      <div id="pxSub" class="dim sm">กำลังโหลด</div>
+    </div>
 
-<details class="card dbg">
-  <summary>Debug — สถานะการเชื่อมต่อ</summary>
-  <pre id="log" class="log">รอข้อมูล...</pre>
-</details>
+    <div class="card stat">
+      <div class="lbl">สรุปข่าวตามความแรง — กดเพื่อกรอง</div>
+      <div class="chips" id="chips">
+        <button class="chip c-high"   data-imp="high"><b id="nHigh">0</b><span>แรงสูง</span></button>
+        <button class="chip c-medium" data-imp="medium"><b id="nMed">0</b><span>แรงกลาง</span></button>
+        <button class="chip c-low"    data-imp="low"><b id="nLow">0</b><span>แรงต่ำ</span></button>
+      </div>
+      <div class="minibias">
+        <div class="split"><i id="splitBar"></i></div>
+        <div class="mbtxt">
+          <span><span id="buyPct" class="up">--</span><span class="dim slash">/</span><span id="sellPct" class="down">--</span></span>
+          <span id="biasTxt" class="dim">--</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card stat">
+      <div class="lbl">ข่าวแรงสูงที่เหลือ</div>
+      <div class="big" id="hiCount">--</div>
+      <div id="nextEv" class="dim sm">--</div>
+    </div>
+  </section>
+
+  <nav class="bar">
+    <div class="segrow">
+      <div class="seg" data-group="view">
+        <button data-v="today" class="on">วันนี้</button>
+        <button data-v="upcoming">ถัดไป</button>
+        <button data-v="week">ทั้งสัปดาห์</button>
+      </div>
+      <div class="seg" data-group="imp">
+        <button data-v="all" class="on">ทุกแรง</button>
+        <button data-v="high">สูง</button>
+        <button data-v="highmed">สูง+กลาง</button>
+      </div>
+      <div class="seg" data-group="ccy">
+        <button data-v="all">ทุกสกุล</button>
+        <button data-v="usd">USD</button>
+        <button data-v="usdeur" class="on">USD+EUR</button>
+      </div>
+    </div>
+    <div class="srow">
+      <input id="q" type="search" placeholder="ค้นหาชื่อข่าว เช่น CPI, NFP">
+      <span id="count" class="dim sm"></span>
+      <span id="status" class="dim sm"></span>
+    </div>
+  </nav>
+
+  <section class="hdrow card">
+    <span>เวลา / สกุล</span><span>ข่าว</span><span>Actual / Forecast / Prev</span><span>คาดก่อนข่าว / ผลจริง</span>
+  </section>
+
+  <main id="list" class="list">
+    <div class="card empty">กำลังโหลด...</div>
+  </main>
+
+  <details class="card dbg">
+    <summary>Debug — สถานะการเชื่อมต่อ</summary>
+    <pre id="log" class="log">รอข้อมูล...</pre>
+  </details>
+</div>
+
+<!-- ===================== PAGE : SCAN ===================== -->
+<div id="pgScan" class="page">
+
+  <section class="scanhero card">
+    <div>
+      <div class="lbl">Asset Scanner</div>
+      <h2 class="h2">Top 10 Gainers / Losers</h2>
+      <p class="dim sm">4 กลุ่มสินทรัพย์ × 4 กรอบเวลา — จัดอันดับอัตโนมัติ</p>
+    </div>
+    <div class="scanmeta">
+      <div><b id="sUpd">--</b><span>อัปเดตล่าสุด</span></div>
+      <div><b id="sCnt">--</b><span>สินทรัพย์ที่สแกน</span></div>
+    </div>
+  </section>
+
+  <nav class="bar">
+    <div class="segrow">
+      <div class="seg" data-sgroup="grp">
+        <button data-v="stocks" class="on">หุ้น</button>
+        <button data-v="commodities">โภคภัณฑ์</button>
+        <button data-v="currencies">สกุลเงิน</button>
+        <button data-v="aifunds">กองทุน AI</button>
+      </div>
+      <div class="seg" data-sgroup="tf">
+        <button data-v="daily" class="on">รายวัน</button>
+        <button data-v="weekly">รายสัปดาห์</button>
+        <button data-v="monthly">รายเดือน</button>
+        <button data-v="yearly">รายปี</button>
+      </div>
+      <div class="seg" data-sgroup="side">
+        <button data-v="both" class="on">ทั้งหมด</button>
+        <button data-v="gain">ขึ้น</button>
+        <button data-v="lose">ลง</button>
+      </div>
+    </div>
+    <div class="srow">
+      <input id="sq" type="search" placeholder="ค้นหาชื่อ / สัญลักษณ์">
+      <span id="sStatus" class="dim sm"></span>
+    </div>
+  </nav>
+
+  <div id="scanBody">
+    <div class="card empty">กำลังโหลดข้อมูลสแกน...</div>
+  </div>
+</div>
 
 <p class="note">
-Buy% / Sell% คำนวณเชิงกลไกจากส่วนต่างตัวเลขเศรษฐกิจเท่านั้น ไม่ใช่คำแนะนำการลงทุน
-และไม่ใช่ความน่าจะเป็นทางสถิติจริง ตลาดมีปัจจัยอื่นอีกมาก เช่น Bond Yield ภูมิรัฐศาสตร์ แรงซื้อธนาคารกลาง
-โปรดใช้ประกอบการวิเคราะห์อื่นและบริหารความเสี่ยงเสมอ
+ข้อมูลทั้งหมดเพื่อการศึกษาและติดตามตลาดเท่านั้น ไม่ใช่คำแนะนำการลงทุน
+ราคาอาจล่าช้าจากตลาดจริง ผลตอบแทนย้อนหลังไม่รับประกันผลในอนาคต
+โปรดตรวจสอบข้อมูลจากแหล่งทางการและบริหารความเสี่ยงเสมอ
 </p>
 
 <script src="js/config.js"></script>
 <script src="js/glossary.js"></script>
 <script src="js/api.js"></script>
 <script src="js/app.js"></script>
+<script src="js/scan.js"></script>
 </body>
 </html>

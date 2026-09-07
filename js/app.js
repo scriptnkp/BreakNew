@@ -340,6 +340,27 @@
     this.textContent = next === "light" ? "☀️" : "🌙";
   });
 
+  /* ---------- Router: สลับหน้า ---------- */
+  $("tabs").addEventListener("click", function (e) {
+    var tab = e.target.closest(".tab");
+    if (!tab) return;
+    var p = tab.getAttribute("data-page");
+
+    var tabs = document.querySelectorAll(".tab");
+    for (var i = 0; i < tabs.length; i++)
+      tabs[i].classList.toggle("on", tabs[i] === tab);
+
+    $("pgGold").classList.toggle("on", p === "gold");
+    $("pgScan").classList.toggle("on", p === "scan");
+    localStorage.setItem("mr_page", p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  var lastPage = localStorage.getItem("mr_page");
+  if (lastPage === "scan") {
+    document.querySelector('.tab[data-page="scan"]').click();
+  }
+
   $("btnRefresh").addEventListener("click", loadAll);
 
   /* ---------- เริ่มทำงาน ---------- */
