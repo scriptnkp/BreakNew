@@ -1,0 +1,33 @@
+name: Fetch Market Scan
+
+on:
+  schedule:
+    - cron: "5 */2 * * *"      # ทุก 2 ชั่วโมง
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install --upgrade yfinance pandas
+
+      - name: Fetch data
+        run: python scripts/fetch_scan.py
+
+      - name: Commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/scan.json
+          git diff --staged --quiet || git commit -m "chore: update market scan $(date -u +%F_%H:%M)"
+          git push
