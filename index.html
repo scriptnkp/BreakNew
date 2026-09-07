@@ -110,28 +110,30 @@
   </details>
 </div>
 
-<!-- ===================== PAGE : SCAN ===================== -->
-<div id="pgScan" class="page">
+<div id="pgScan" class="page" data-grp="th">
 
   <section class="scanhero card">
-    <div>
+    <div class="shleft">
       <div class="lbl">Asset Scanner</div>
       <h2 class="h2">Top 10 Gainers / Losers</h2>
-      <p class="dim sm">4 กลุ่มสินทรัพย์ × 4 กรอบเวลา — จัดอันดับอัตโนมัติ</p>
+      <p class="dim sm">5 กลุ่มสินทรัพย์ × 4 กรอบเวลา — จัดอันดับอัตโนมัติ</p>
     </div>
     <div class="scanmeta">
-      <div><b id="sUpd">--</b><span>อัปเดตล่าสุด</span></div>
-      <div><b id="sCnt">--</b><span>สินทรัพย์ที่สแกน</span></div>
+      <div class="mtile m1"><b id="sUpd">--</b><span>อัปเดตล่าสุด</span></div>
+      <div class="mtile m2"><b id="sCnt">--</b><span>สินทรัพย์ทั้งหมด</span></div>
+      <div class="mtile m3"><b id="sUp">--</b><span>บวก</span></div>
+      <div class="mtile m4"><b id="sDn">--</b><span>ลบ</span></div>
     </div>
   </section>
 
   <nav class="bar">
     <div class="segrow">
-      <div class="seg" data-sgroup="grp">
-        <button data-v="stocks" class="on">หุ้น</button>
-        <button data-v="commodities">โภคภัณฑ์</button>
-        <button data-v="currencies">สกุลเงิน</button>
-        <button data-v="aifunds">กองทุน AI</button>
+      <div class="seg segc" data-sgroup="grp">
+        <button data-v="th" class="on"><span class="gi">🇹🇭</span>หุ้นไทย</button>
+        <button data-v="global"><span class="gi">🌍</span>หุ้นต่างประเทศ</button>
+        <button data-v="commodities"><span class="gi">🛢️</span>โภคภัณฑ์</button>
+        <button data-v="currencies"><span class="gi">💱</span>สกุลเงิน</button>
+        <button data-v="aifunds"><span class="gi">🤖</span>กองทุน AI</button>
       </div>
       <div class="seg" data-sgroup="tf">
         <button data-v="daily" class="on">รายวัน</button>
@@ -141,12 +143,12 @@
       </div>
       <div class="seg" data-sgroup="side">
         <button data-v="both" class="on">ทั้งหมด</button>
-        <button data-v="gain">ขึ้น</button>
-        <button data-v="lose">ลง</button>
+        <button data-v="gain">▲ ขึ้น</button>
+        <button data-v="lose">▼ ลง</button>
       </div>
     </div>
     <div class="srow">
-      <input id="sq" type="search" placeholder="ค้นหาชื่อ / สัญลักษณ์">
+      <input id="sq" type="search" placeholder="ค้นหาชื่อ / สัญลักษณ์ เช่น PTT, NVDA">
       <span id="sStatus" class="dim sm"></span>
     </div>
   </nav>
