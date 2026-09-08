@@ -100,13 +100,12 @@
   </details>
 </div>
 
-<!-- ================= SCAN ================= -->
 <div id="pgScan" class="page" data-grp="th">
   <section class="scanhero card">
     <div class="shleft">
       <div class="lbl">Asset Scanner</div>
       <h2 class="h2">Top 10 Gainers / Losers</h2>
-      <p class="dim sm">7 กลุ่มสินทรัพย์ × 4 กรอบเวลา + สัญญาณเทคนิค</p>
+      <p class="dim sm">9 กลุ่มสินทรัพย์ × 4 กรอบเวลา + สัญญาณเทคนิค</p>
     </div>
     <div class="scanmeta">
       <div class="mtile m1"><b id="sUpd">--</b><span>อัปเดตล่าสุด</span></div>
@@ -117,21 +116,27 @@
   </section>
 
   <nav class="bar">
-    <div class="segrow">
-      <div class="seg segc" data-sgroup="grp">
-        <button data-v="th" class="on"><span class="gi">🇹🇭</span>หุ้นไทย</button>
-        <button data-v="global"><span class="gi">🌍</span>หุ้นต่างประเทศ</button>
-        <button data-v="energy"><span class="gi">⚡</span>พลังงาน</button>
-        <button data-v="crypto"><span class="gi">₿</span>คริปโต</button>
-        <button data-v="commodities"><span class="gi">🛢️</span>โภคภัณฑ์</button>
-        <button data-v="currencies"><span class="gi">💱</span>สกุลเงิน</button>
-        <button data-v="aifunds"><span class="gi">🤖</span>กองทุน AI</button>
+    <div class="segwrap">
+      <div class="segrow">
+        <div class="seg segc" data-sgroup="grp">
+          <button data-v="aipicks"><span class="gi">✨</span>AI คัดให้</button>
+          <button data-v="th" class="on"><span class="gi">🇹🇭</span>หุ้นไทย</button>
+          <button data-v="us500"><span class="gi">🇺🇸</span>S&amp;P / Nasdaq</button>
+          <button data-v="global"><span class="gi">🌍</span>ต่างประเทศ</button>
+          <button data-v="energy"><span class="gi">⚡</span>พลังงาน</button>
+          <button data-v="crypto"><span class="gi">₿</span>คริปโต</button>
+          <button data-v="commodities"><span class="gi">🛢️</span>โภคภัณฑ์</button>
+          <button data-v="currencies"><span class="gi">💱</span>สกุลเงิน</button>
+          <button data-v="aifunds"><span class="gi">🤖</span>กองทุน AI</button>
+        </div>
       </div>
+    </div>
+    <div class="segrow mt8">
       <div class="seg" data-sgroup="tf">
         <button data-v="daily" class="on">รายวัน</button>
-        <button data-v="weekly">รายสัปดาห์</button>
-        <button data-v="monthly">รายเดือน</button>
-        <button data-v="yearly">รายปี</button>
+        <button data-v="weekly">สัปดาห์</button>
+        <button data-v="monthly">เดือน</button>
+        <button data-v="yearly">ปี</button>
       </div>
       <div class="seg" data-sgroup="side">
         <button data-v="both" class="on">ทั้งหมด</button>
@@ -140,7 +145,7 @@
       </div>
     </div>
     <div class="srow">
-      <input id="sq" type="search" placeholder="ค้นหาชื่อ / สัญลักษณ์ เช่น PTT, NVDA, BTC">
+      <input id="sq" type="search" placeholder="ค้นหา เช่น PTT, NVDA, BTC">
       <span id="sStatus" class="dim sm"></span>
     </div>
   </nav>
@@ -148,13 +153,14 @@
   <div id="scanBody"><div class="card empty">กำลังโหลดข้อมูลสแกน...</div></div>
 
   <div class="card legend">
-    <div class="lbl">คำอธิบายสัญญาณเทคนิค</div>
+    <div class="lbl">คำอธิบายสัญญาณ</div>
     <div class="lgrid">
+      <div><span class="bdg b-ai">AI 80+</span> คะแนนรวมจาก 5 ปัจจัย ยิ่งสูงยิ่งน่าสนใจ</div>
       <div><span class="bdg b-ob">RSI &gt; 70</span> ซื้อมากเกินไป เสี่ยงย่อตัว</div>
       <div><span class="bdg b-os">RSI &lt; 30</span> ขายมากเกินไป อาจเด้งกลับ</div>
-      <div><span class="bdg b-gc">Golden Cross</span> MA50 อยู่เหนือ MA200 = แนวโน้มขาขึ้น</div>
-      <div><span class="bdg b-dc">Death Cross</span> MA50 ต่ำกว่า MA200 = แนวโน้มขาลง</div>
-      <div><span class="bdg b-vs">Vol Spike</span> ปริมาณซื้อขายเกิน 2 เท่าค่าเฉลี่ย 20 วัน</div>
+      <div><span class="bdg b-gc">Golden</span> MA50 เหนือ MA200 = แนวโน้มขาขึ้น</div>
+      <div><span class="bdg b-dc">Death</span> MA50 ต่ำกว่า MA200 = แนวโน้มขาลง</div>
+      <div><span class="bdg b-vs">Vol x2</span> ปริมาณเกิน 2 เท่าค่าเฉลี่ย 20 วัน</div>
     </div>
   </div>
 </div>
