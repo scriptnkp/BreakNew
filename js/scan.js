@@ -1,8 +1,10 @@
-/* ===== Scan สินทรัพย์ 7 กลุ่ม — responsive table/card ===== */
+/* ===== Scan สินทรัพย์ 7 กลุ่ม — refresh ตรงเวลา :00 / :30 ===== */
 (function () {
 
   var DATA = null;
   var S = { grp: "th", tf: "daily", side: "both", q: "" };
+  var nextAt = 0;
+  var tickTimer = null;
 
   var GRP = {
     th:          { n: "หุ้นไทย (SET)",     i: "🇹🇭", alt: "stocks" },
@@ -41,6 +43,8 @@
   }
 
   function na(t) { return t === null ? '<span class="na">N/A</span>' : t; }
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
 
   function rowClass(p) {
     if (p === null || p === undefined || isNaN(p)) return "";
@@ -209,24 +213,58 @@
     if (S.side !== "gain") html += block("▼ Top 10 Losers", "p-lose", lose);
 
     $("scanBody").innerHTML = html || '<div class="card empty">ไม่มีข้อมูล</div>';
-    $("sStatus").textContent = "• กลุ่มนี้ " + all.length + " รายการ";
+    S._count = all.length;
+    updateStatus();
   }
 
+  /* ---------- ตัวจับเวลาถึงรอบถัดไป ---------- */
+  function nextSlot() {
+    var d = new Date();
+    d.setSeconds(20, 0);                       // เผื่อ 20 วิให้ไฟล์ถูก push เสร็จ
+    var m = d.getMinutes();
+    d.setMinutes(m < 30 ? 30 : 60);
+    return d.getTime();
+  }
+
+  function updateStatus() {
+    var left = Math.max(0, nextAt - Date.now());
+    var mm = Math.floor(left / 60000);
+    var ss = Math.floor((left % 60000) / 1000);
+    var slot = new Date(nextAt);
+    $("sStatus").textContent = "• กลุ่มนี้ " + (S._count || 0) + " รายการ  |  รอบถัดไป " +
+      pad(slot.getHours()) + ":" + pad(slot.getMinutes()) +
+      " (อีก " + pad(mm) + ":" + pad(ss) + ")";
+  }
+
+  function scheduleNext() {
+    nextAt = nextSlot();
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(function () {
+      if (Date.now() >= nextAt) load();
+      else updateStatus();
+    }, 1000);
+    updateStatus();
+  }
+
+  /* ---------- โหลดข้อมูล ---------- */
   function load() {
     $("sStatus").textContent = "กำลังโหลด...";
-    fetch("data/scan.json?t=" + Date.now())
+    fetch("data/scan.json?t=" + Date.now(), { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (j) {
         DATA = j;
-        $("sUpd").textContent = new Date(j.updated).toLocaleString("th-TH",
+        var u = new Date(j.updated);
+        $("sUpd").textContent = u.toLocaleString("th-TH",
           { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
         $("sCnt").textContent = j.total || "--";
         render();
+        scheduleNext();
       })
       .catch(function (e) {
         $("scanBody").innerHTML = '<div class="card empty"><span class="down">โหลดข้อมูลไม่ได้ — ' +
           esc(e.message) + '</span><br><span class="sm dim">ตรวจว่า GitHub Actions สร้าง data/scan.json แล้วหรือยัง</span></div>';
-        $("sStatus").textContent = "ผิดพลาด";
+        $("sStatus").textContent = "ผิดพลาด • ลองใหม่ใน 1 นาที";
+        setTimeout(load, 60000);
       });
   }
 
@@ -258,7 +296,11 @@
     t = setTimeout(function () { S.q = v; render(); }, 220);
   });
 
+  /* กลับมาเปิดแท็บอีกครั้ง → ถ้าเลยรอบแล้วโหลดทันที */
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && nextAt && Date.now() >= nextAt) load();
+  });
+
   window.SCAN = { load: load };
   load();
-  setInterval(load, 5 * 60 * 1000);
 })();
