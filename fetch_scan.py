@@ -2,6 +2,28 @@
 """ดึงข้อมูลสินทรัพย์ 4 กลุ่ม × 4 กรอบเวลา → data/scan.json"""
 import json, os, time, datetime as dt
 import yfinance as yf
+# เพิ่มส่วนนี้ที่ด้านบนของไฟล์ scripts/fetch_scan.py
+import requests
+
+def fetch_calendar():
+    print("\n=== Fetching Calendar ===")
+    urls = [
+        "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+        "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json"
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                data = r.json()
+                with open("data/calendar.json", "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+                print("  calendar updated")
+                return
+        except: continue
+    print("  calendar update failed")
+
+# ในฟังก์ชัน build() ให้เรียก fetch_calendar() ก่อนเริ่ม scan หุ้น
 
 UNIVERSE = {
     "stocks": [
