@@ -22,36 +22,6 @@
   var TFS = { daily: "1 วัน", weekly: "1 สัปดาห์", monthly: "1 เดือน", yearly: "1 ปี" };
   var STOCKISH = ["th", "global", "energy", "aifunds"];
 
-  /* ... เพิ่มตัวแปรด้านบน ... */
-var PAGE = 0;
-var PER_PAGE = 10;
-
-/* ... ใน render() แก้ส่วนสรุป ... */
-function render() {
-    // ... (โค้ดคัดแยก Gainers/Losers เหมือนเดิม) ...
-    
-    // แทนที่ส่วนการสร้าง html ด้วยฟังก์ชันใหม่
-    $("scanBody").innerHTML = renderPage("Gainers", "p-gain", gain) + renderPage("Losers", "p-lose", lose);
-}
-
-function renderPage(pill, cls, list) {
-    var total = Math.ceil(list.length / PER_PAGE);
-    var paged = list.slice(PAGE * PER_PAGE, (PAGE + 1) * PER_PAGE);
-    
-    // ... (ส่วนสร้างตารางเดิม ให้ใช้ paged แทน list) ...
-    // เพิ่มปุ่มเปลี่ยนหน้า
-    var nav = '<div class="pg-nav"><button onclick="window.SCAN.prev()">◀</button><span>' + 
-              (PAGE+1) + '/' + total + '</span><button onclick="window.SCAN.next()">▶</button></div>';
-    return block(...) + nav;
-}
-
-/* เพิ่มฟังก์ชันให้ window.SCAN */
-window.SCAN = { 
-    load: load,
-    next: function() { PAGE++; render(); },
-    prev: function() { if(PAGE>0) PAGE--; render(); }
-};
-
   function $(id) { return document.getElementById(id); }
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
 
