@@ -1,4 +1,4 @@
-name: Fetch Market Scan
+name: Fetch Market Data
 
 on:
   schedule:
@@ -9,16 +9,63 @@ permissions:
   contents: write
 
 concurrency:
-  group: market-scan
+  group: market-data
   cancel-in-progress: false
 
 jobs:
-  scan:
+  fetch-and-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
+      # ==========================================
+      # 1. ส่วนดึงข้อมูลปฏิทิน (จาก fetch-calendar.yml)
+      # ==========================================
+      - name: Fetch FF Calendar
+        run: |
+          mkdir -p data
+
+          get () {
+            curl -sSL --max-time 30 \
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+              -H "Accept: application/json" \
+              "$1" -o "$2"
+            if [ $? -ne 0 ]; then echo "curl fail"; return 1; fi
+            if head -c 400 "$2" | grep -qi "doctype\|Request Denied"; then
+              echo "rate limited"; return 1
+            fi
+            if ! jq -e 'type=="array" and length>0' "$2" >/dev/null 2>&1; then
+              echo "bad json"; return 1
+            fi
+            return 0
+          }
+
+          ok=0
+          for u in \
+            "https://nfs.faireconomy.media/ff_calendar_thisweek.json" \
+            "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json"
+          do
+            echo "try $u"
+            if get "$u" this.json; then ok=1; break; fi
+            sleep 15
+          done
+
+          if [ "$ok" = "0" ]; then
+            echo "::warning::ดึงข้อมูลไม่สำเร็จ คงไฟล์เดิมไว้"
+          else
+            if get "https://nfs.faireconomy.media/ff_calendar_nextweek.json" next.json; then
+              jq -s 'add' this.json next.json > data/calendar.json
+            else
+              cp this.json data/calendar.json
+            fi
+            echo "{\"updated\":\"$(date -u +%FT%TZ)\",\"count\":$(jq 'length' data/calendar.json)}" > data/meta.json
+            echo "saved $(jq 'length' data/calendar.json) events"
+          fi
+
+      # ==========================================
+      # 2. ส่วนดึงข้อมูลหุ้น (จาก scan.yml)
+      # ==========================================
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -28,14 +75,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Fetch data
+      - name: Fetch Market Scan
         run: python scripts/fetch_scan.py
 
-      - name: Commit
+      # ==========================================
+      # 3. รวมการ Commit & Push กลับเข้า Github ทีเดียว
+      # ==========================================
+      - name: Commit and Push
         run: |
-          git config user.name  "github-actions[bot]"
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # ดึงข้อมูลล่าสุดก่อนป้องกัน Conflict
           git pull --rebase --autostash origin main || true
-          git add data/scan.json
-          git diff --staged --quiet || git commit -m "chore: market scan $(date -u +%F_%H:%M)"
+          
+          # Add โฟลเดอร์ data/ ทั้งหมด (รวมทั้ง calendar.json, meta.json และ scan.json)
+          git add data/
+          
+          # เช็คว่ามีการเปลี่ยนแปลงไหม ถ้ามีค่อย commit และ push
+          git diff --staged --quiet || git commit -m "chore: auto update data $(date -u +%F_%H:%M)"
           git push
