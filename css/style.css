@@ -284,3 +284,8 @@ i.sc-d{background:var(--down)}
 .mc-rank>span:first-child{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
 
 table.dt{min-width:1180px}
+
+.pg-nav { display:flex; justify-content:center; align-items:center; gap:15px; margin:15px 0; }
+.pg-nav button { background:var(--card); border:1px solid var(--line); padding:5px 15px; border-radius:8px; cursor:pointer; }
+.pg-nav span { font-size:12px; font-weight:700; color:var(--dim); }
+
