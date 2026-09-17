@@ -1,227 +1,444 @@
-# -*- coding: utf-8 -*-
-"""ดึงปฏิทินข่าว + สแกนสินทรัพย์ 7 กลุ่ม x 4 กรอบเวลา -> data/"""
-import json, os, math, datetime as dt
-import pandas as pd
-import requests
-import yfinance as yf
+/* ===== Scan 7 กลุ่ม — 30 รายการ แบ่งหน้าละ 10 + Ranking + เรียงคอลัมน์ ===== */
+(function () {
 
-# ===================== ปฏิทินข่าว =====================
-CAL_URLS = [
-    "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
-    "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json",
-]
-CAL_NEXT = "https://nfs.faireconomy.media/ff_calendar_nextweek.json"
-UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json"}
+  var DATA = null;
+  var S = { grp: "th", tf: "daily", side: "both", q: "" };
+  var SORT = { key: "pct", dir: -1 };
+  var PG = { gain: 0, lose: 0 };
+  var nextAt = 0, tickTimer = null;
 
+  var TOPN = 30;
+  var PER = 10;
+  var TZ = "Asia/Bangkok";
 
-def get_json(url):
-    r = requests.get(url, timeout=30, headers=UA)
-    if r.status_code != 200:
-        raise RuntimeError(f"HTTP {r.status_code}")
-    if r.text.lstrip().startswith("<"):
-        raise RuntimeError("ได้ HTML (โดน rate limit)")
-    data = r.json()
-    if not isinstance(data, list) or not data:
-        raise RuntimeError("ข้อมูลไม่ใช่ array")
-    return data
+  var GRP = {
+    th:          { n: "หุ้นไทย (SET)",     i: "🇹🇭", alt: "stocks" },
+    global:      { n: "หุ้นต่างประเทศ",    i: "🌍",  alt: "stocks" },
+    energy:      { n: "พลังงาน",           i: "⚡",  alt: null },
+    crypto:      { n: "คริปโตเคอร์เรนซี",  i: "₿",   alt: null },
+    commodities: { n: "สินค้าโภคภัณฑ์",    i: "🛢️", alt: null },
+    currencies:  { n: "สกุลเงิน / Forex",  i: "💱",  alt: null },
+    aifunds:     { n: "กองทุน AI (ETF)",   i: "🤖",  alt: null }
+  };
+  var TF  = { daily: "รายวัน", weekly: "รายสัปดาห์", monthly: "รายเดือน", yearly: "รายปี" };
+  var TFS = { daily: "1 วัน", weekly: "1 สัปดาห์", monthly: "1 เดือน", yearly: "1 ปี" };
+  var STOCKISH = ["th", "global", "energy", "aifunds"];
 
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
 
-def fetch_calendar():
-    print("\n=== ปฏิทินข่าว ===")
-    this_week = None
-    for u in CAL_URLS:
-        try:
-            this_week = get_json(u)
-            print(f"  ok {u} -> {len(this_week)} รายการ")
-            break
-        except Exception as e:
-            print(f"  fail {u}: {e}")
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
 
-    if not this_week:
-        print("  ! ดึงไม่สำเร็จ คงไฟล์เดิมไว้")
-        return
+  function fmtNum(v, dp) {
+    if (v === null || v === undefined || v === "" || isNaN(v)) return null;
+    return Number(v).toLocaleString("en-US", { minimumFractionDigits: dp, maximumFractionDigits: dp });
+  }
 
-    merged = list(this_week)
-    try:
-        nxt = get_json(CAL_NEXT)
-        merged += nxt
-        print(f"  ok nextweek -> {len(nxt)} รายการ")
-    except Exception as e:
-        print(f"  skip nextweek: {e}")
+  function fmtBig(v) {
+    if (v === null || v === undefined || isNaN(v) || v === 0) return null;
+    var a = Math.abs(v);
+    if (a >= 1e12) return (v / 1e12).toFixed(2) + "T";
+    if (a >= 1e9)  return (v / 1e9).toFixed(2)  + "B";
+    if (a >= 1e6)  return (v / 1e6).toFixed(2)  + "M";
+    if (a >= 1e3)  return (v / 1e3).toFixed(2)  + "K";
+    return Number(v).toFixed(0);
+  }
 
-    os.makedirs("data", exist_ok=True)
-    with open("data/calendar.json", "w", encoding="utf-8") as f:
-        json.dump(merged, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"  ✔ data/calendar.json — {len(merged)} รายการ")
+  function na(t) { return t === null ? '<span class="na">N/A</span>' : t; }
 
+  /* ---------- Ranking ---------- */
+  function buildCtx(list) {
+    var mc = 0, mv = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].cap && list[i].cap > mc) mc = list[i].cap;
+      if (list[i].vol && list[i].vol > mv) mv = list[i].vol;
+    }
+    return { lc: mc > 0 ? Math.log10(mc) : 0, lv: mv > 0 ? Math.log10(mv) : 0 };
+  }
 
-# ===================== สแกนสินทรัพย์ =====================
-UNIVERSE = {
-    "th": [
-        "PTT.BK","PTTEP.BK","AOT.BK","ADVANC.BK","CPALL.BK","SCB.BK","KBANK.BK",
-        "BBL.BK","KTB.BK","SCC.BK","GULF.BK","BDMS.BK","CPN.BK","MINT.BK","TRUE.BK",
-        "DELTA.BK","BH.BK","EA.BK","TOP.BK","IVL.BK","CRC.BK","OR.BK","BEM.BK",
-        "HMPRO.BK","TU.BK","GPSC.BK","BANPU.BK","AWC.BK","LH.BK","INTUCH.BK",
-        "CPF.BK","CPAXT.BK","TTB.BK","BTS.BK","EGCO.BK","RATCH.BK","KCE.BK",
-        "SAWAD.BK","MTC.BK","TIDLOR.BK","JMT.BK","PTTGC.BK","SPRC.BK","BCP.BK",
-        "WHA.BK","AMATA.BK","SIRI.BK","AP.BK","COM7.BK","SCGP.BK","BJC.BK",
-        "OSP.BK","CBG.BK","TISCO.BK","KKP.BK","BLA.BK","TCAP.BK","STA.BK",
-    ],
-    "global": [
-        "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","NFLX",
-        "JPM","V","MA","UNH","WMT","COST","ORCL","CRM","ADBE","INTC",
-        "QCOM","MU","ARM","PLTR","SMCI","TSM","BABA","ASML","SAP","DIS",
-        "BA","CAT","GE","LLY","NVO","PFE","KO","PEP","MCD","NKE",
-        "BRK-B","JNJ","PG","HD","ABBV","MRK","CVX","BAC","TMO","CSCO",
-        "7203.T","6758.T","005930.KS","0700.HK","9988.HK","NESN.SW","MC.PA","SIE.DE",
-    ],
-    "energy": [
-        "XOM","CVX","COP","SLB","EOG","PSX","MPC","VLO","OXY","HAL",
-        "BKR","DVN","FANG","HES","WMB","KMI","OKE","LNG","SHEL","BP",
-        "TTE","ENPH","FSLR","SEDG","RUN","NEE","BEP","ICLN","TAN","XLE",
-        "PTT.BK","PTTEP.BK","TOP.BK","BCP.BK","GULF.BK","GPSC.BK","EGCO.BK","BANPU.BK",
-    ],
-    "crypto": [
-        "BTC-USD","ETH-USD","BNB-USD","SOL-USD","XRP-USD","ADA-USD","DOGE-USD",
-        "AVAX-USD","TRX-USD","DOT-USD","LINK-USD","MATIC-USD","TON-USD","SHIB-USD",
-        "LTC-USD","BCH-USD","NEAR-USD","UNI-USD","APT-USD","ATOM-USD",
-        "ICP-USD","XLM-USD","ARB-USD","OP-USD","INJ-USD","FIL-USD","HBAR-USD",
-        "MSTR","COIN","MARA","RIOT","IBIT",
-    ],
-    "commodities": [
-        "GC=F","SI=F","PL=F","PA=F","HG=F","CL=F","BZ=F","NG=F","HO=F","RB=F",
-        "ZC=F","ZW=F","ZS=F","ZM=F","ZL=F","KC=F","SB=F","CT=F","CC=F","LE=F",
-        "ALI=F","OJ=F","HE=F","GF=F",
-    ],
-    "currencies": [
-        "THB=X","EURUSD=X","GBPUSD=X","USDJPY=X","AUDUSD=X","NZDUSD=X","USDCAD=X",
-        "USDCHF=X","USDCNY=X","USDSGD=X","USDKRW=X","USDINR=X","USDMYR=X","USDIDR=X",
-        "USDVND=X","USDPHP=X","EURJPY=X","GBPJPY=X","EURGBP=X","AUDJPY=X",
-        "EURTHB=X","JPYTHB=X","CNYTHB=X","DX-Y.NYB",
-    ],
-    "aifunds": [
-        "BOTZ","ROBO","ROBT","IRBO","AIQ","ARKQ","ARKW","ARKK","WTAI","THNQ",
-        "CHAT","XT","IGPT","UBOT","QTUM","SMH","SOXX","XLK","VGT","FDN",
-        "AIVL","LOUP","BLOK","DTEC","CIBR","IYW",
-    ],
-}
+  function calcScore(r, ctx) {
+    var sum = 0, wt = 0;
 
-STOCK_LIKE = ("th", "global", "energy", "aifunds")
-TFS = [("daily", 1), ("weekly", 5), ("monthly", 21), ("yearly", 252)]
+    if (r.rsi !== null && r.rsi !== undefined) {
+      var v;
+      if (r.rsi >= 45 && r.rsi <= 65) v = 100;
+      else if (r.rsi < 45) v = Math.max(5, 100 - (45 - r.rsi) * 2.0);
+      else v = Math.max(5, 100 - (r.rsi - 65) * 2.6);
+      sum += v * 25; wt += 25;
+    }
 
+    var sg = 50;
+    if (r.ma === "golden") sg = 95;
+    else if (r.ma === "up50") sg = 75;
+    else if (r.ma === "dn50") sg = 35;
+    else if (r.ma === "death") sg = 15;
+    if (r.vs) { if (r.vs >= 2) sg += 15; else if (r.vs >= 1.3) sg += 7; }
+    sum += Math.min(100, sg) * 25; wt += 25;
 
-def rsi14(close):
-    if len(close) < 20:
-        return None
-    d = close.diff()
-    up = d.clip(lower=0).ewm(alpha=1 / 14, adjust=False).mean()
-    dn = (-d.clip(upper=0)).ewm(alpha=1 / 14, adjust=False).mean()
-    last = float(dn.iloc[-1])
-    if last == 0:
-        return 100.0
-    return round(100 - 100 / (1 + float(up.iloc[-1]) / last), 1)
+    if (r.cap && ctx.lc > 0) {
+      sum += Math.max(0, Math.min(100, (Math.log10(r.cap) / ctx.lc) * 100)) * 20; wt += 20;
+    }
 
+    if (r.pe && r.pe > 0) {
+      var pe;
+      if (r.pe >= 8 && r.pe <= 20) pe = 100;
+      else if (r.pe < 8) pe = 70;
+      else pe = Math.max(10, 100 - (r.pe - 20) * 2.2);
+      sum += pe * 15; wt += 15;
+    }
 
-def safe(v):
-    try:
-        f = float(v)
-        return None if (math.isnan(f) or math.isinf(f)) else f
-    except Exception:
-        return None
+    if (r.vol && ctx.lv > 0) {
+      sum += Math.max(0, Math.min(100, (Math.log10(r.vol) / ctx.lv) * 100)) * 15; wt += 15;
+    }
 
+    return wt > 0 ? Math.round(sum / wt) : null;
+  }
 
-def scan():
-    out = {"updated": dt.datetime.utcnow().isoformat() + "Z", "groups": {}, "total": 0}
-    total = 0
+  function scoreHTML(sc) {
+    if (sc === null) return '<span class="na">-</span>';
+    var cls = sc >= 75 ? "sc-a" : sc >= 60 ? "sc-b" : sc >= 45 ? "sc-c" : "sc-d";
+    return '<span class="scw"><span class="scb ' + cls + '">' + sc + '</span>' +
+           '<span class="scbar"><i class="' + cls + '" style="width:' + sc + '%"></i></span></span>';
+  }
 
-    for grp, syms in UNIVERSE.items():
-        print(f"\n=== {grp} ({len(syms)}) ===")
-        buckets = {tf: [] for tf, _ in TFS}
+  /* ---------- cells ---------- */
+  function rowClass(p) {
+    if (p === null || p === undefined || isNaN(p)) return "";
+    var a = Math.abs(p);
+    var lv = a >= 5 ? 3 : a >= 2 ? 2 : a > 0 ? 1 : 0;
+    return lv ? "r-" + (p > 0 ? "u" : "d") + lv : "";
+  }
 
-        try:
-            raw = yf.download(syms, period="2y", interval="1d", group_by="ticker",
-                              threads=True, progress=False, auto_adjust=False)
-        except Exception as e:
-            print("  download error:", e)
-            out["groups"][grp] = buckets
-            continue
+  function pctHTML(p, maxAbs) {
+    if (p === null || p === undefined || isNaN(p)) return '<span class="na">N/A</span>';
+    var cls = p > 0 ? "up" : p < 0 ? "down" : "dim";
+    var w = maxAbs > 0 ? Math.min(100, Math.abs(p) / maxAbs * 100) : 0;
+    return '<span class="pcell"><span class="pc ' + cls + '">' + (p > 0 ? "+" : "") +
+      Number(p).toFixed(2) + '%</span><span class="pbar"><i class="' + (p > 0 ? "u" : "d") +
+      '" style="width:' + w.toFixed(1) + '%"></i></span></span>';
+  }
 
-        for sym in syms:
-            try:
-                df = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
-                close = df["Close"].dropna()
-                if len(close) < 3:
-                    continue
+  function chgHTML(c, dp) {
+    if (c === null || c === undefined || isNaN(c)) return '<span class="na">N/A</span>';
+    var cls = c > 0 ? "up" : c < 0 ? "down" : "dim";
+    return '<span class="chgv ' + cls + '">' + (c > 0 ? "+" : "") + fmtNum(c, dp) + "</span>";
+  }
 
-                price = float(close.iloc[-1])
-                vol = safe(df["Volume"].iloc[-1]) if "Volume" in df else None
+  function rsiHTML(r) {
+    if (r === null || r === undefined || isNaN(r)) return '<span class="na">-</span>';
+    var cls = r >= 70 ? "b-ob" : r <= 30 ? "b-os" : "b-nu";
+    return '<span class="bdg ' + cls + '">' + Number(r).toFixed(0) + "</span>";
+  }
 
-                rsi = rsi14(close)
-                ma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else None
-                ma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else None
-                ma_sig = None
-                if ma50 and ma200:
-                    ma_sig = "golden" if ma50 > ma200 else "death"
-                elif ma50:
-                    ma_sig = "up50" if price > ma50 else "dn50"
+  function sigHTML(r) {
+    var o = [];
+    if (r.ma === "golden") o.push('<span class="bdg b-gc">Golden</span>');
+    else if (r.ma === "death") o.push('<span class="bdg b-dc">Death</span>');
+    else if (r.ma === "up50") o.push('<span class="bdg b-u50">&gt;MA50</span>');
+    else if (r.ma === "dn50") o.push('<span class="bdg b-d50">&lt;MA50</span>');
+    if (r.vs && r.vs >= 2) o.push('<span class="bdg b-vs">Vol x' + Number(r.vs).toFixed(1) + "</span>");
+    if (r.rsi !== null && r.rsi !== undefined) {
+      if (r.rsi >= 70) o.push('<span class="bdg b-ob">OB</span>');
+      else if (r.rsi <= 30) o.push('<span class="bdg b-os">OS</span>');
+    }
+    return o.length ? '<span class="sigs">' + o.join("") + "</span>" : '<span class="na">-</span>';
+  }
 
-                vspike = None
-                if "Volume" in df:
-                    v = df["Volume"].dropna()
-                    if len(v) >= 21 and vol:
-                        avg = float(v.iloc[-21:-1].mean())
-                        if avg > 0:
-                            vspike = round(vol / avg, 2)
+  /* ---------- data ---------- */
+  function bucket() {
+    if (!DATA || !DATA.groups) return null;
+    var g = DATA.groups[S.grp];
+    if (!g && GRP[S.grp].alt) g = DATA.groups[GRP[S.grp].alt];
+    return g || null;
+  }
 
-                name, cap, pe = sym, None, None
-                try:
-                    tk = yf.Ticker(sym)
-                    fi = tk.fast_info
-                    cap = safe(getattr(fi, "market_cap", None))
-                    if grp in STOCK_LIKE or grp == "crypto":
-                        info = tk.info
-                        name = info.get("shortName") or info.get("longName") or sym
-                        pe = safe(info.get("trailingPE"))
-                        if cap is None:
-                            cap = safe(info.get("marketCap"))
-                except Exception:
-                    pass
+  function getRows() {
+    var g = bucket();
+    var list = (g && g[S.tf]) ? g[S.tf].slice() : [];
+    if (S.q) {
+      var q = S.q;
+      list = list.filter(function (r) {
+        return (r.name || "").toLowerCase().indexOf(q) > -1 ||
+               (r.sym  || "").toLowerCase().indexOf(q) > -1;
+      });
+    }
+    var ctx = buildCtx(list);
+    for (var i = 0; i < list.length; i++) list[i]._sc = calcScore(list[i], ctx);
+    return list;
+  }
 
-                if cap is None and vol:
-                    cap = vol * price
+  function sortList(list) {
+    var k = SORT.key, d = SORT.dir;
+    return list.sort(function (a, b) {
+      var x, y;
+      if (k === "name") {
+        x = (a.name || a.sym || "").toLowerCase();
+        y = (b.name || b.sym || "").toLowerCase();
+        return x < y ? -d : x > y ? d : 0;
+      }
+      if (k === "sig") {
+        x = a.ma === "golden" ? 3 : a.ma === "up50" ? 2 : a.ma === "dn50" ? 1 : 0;
+        y = b.ma === "golden" ? 3 : b.ma === "up50" ? 2 : b.ma === "dn50" ? 1 : 0;
+      } else { x = a[k]; y = b[k]; }
+      var nx = (x === null || x === undefined || isNaN(x));
+      var ny = (y === null || y === undefined || isNaN(y));
+      if (nx && ny) return 0;
+      if (nx) return 1;
+      if (ny) return -1;
+      return (x - y) * d;
+    });
+  }
 
-                base = {"sym": sym, "name": name, "price": round(price, 6), "cap": cap,
-                        "pe": round(pe, 2) if pe else None, "vol": vol,
-                        "rsi": rsi, "ma": ma_sig, "vs": vspike}
+  var COLS = [
+    { k: "name",  t: "ชื่อสินทรัพย์", a: "l" },
+    { k: "_sc",   t: "Ranking",       a: "c" },
+    { k: "price", t: "ราคาล่าสุด",    a: "r" },
+    { k: "chg",   t: "",              a: "r" },
+    { k: "pct",   t: "",              a: "r" },
+    { k: "rsi",   t: "RSI",           a: "c" },
+    { k: "sig",   t: "สัญญาณ",        a: "c" },
+    { k: "cap",   t: "",              a: "r" },
+    { k: "pe",    t: "P/E",           a: "r" },
+    { k: "vol",   t: "Volume",        a: "r" }
+  ];
 
-                for tf, back in TFS:
-                    idx = -1 - back
-                    if len(close) < abs(idx):
-                        idx = 0
-                    prev = float(close.iloc[idx])
-                    row = dict(base)
-                    row["chg"] = round(price - prev, 6)
-                    row["pct"] = round((price - prev) / prev * 100, 4) if prev else None
-                    buckets[tf].append(row)
+  function tableHTML(page, start, dp, capLabel, maxAbs) {
+    var h = '<div class="scroller"><table class="dt"><thead><tr>';
+    for (var c = 0; c < COLS.length; c++) {
+      var col = COLS[c];
+      var label = col.t ||
+        (col.k === "chg" ? "ผลต่าง " + TFS[S.tf] :
+         col.k === "pct" ? "% " + TF[S.tf] : capLabel);
+      var on = SORT.key === col.k ? " sorted" : "";
+      var ar = SORT.key === col.k ? (SORT.dir === -1 ? " ▼" : " ▲") : " ⇅";
+      h += '<th class="sortable ta-' + col.a + on + '" data-k="' + col.k + '">' +
+           esc(label) + '<span class="sar">' + ar + "</span></th>";
+    }
+    h += "</tr></thead><tbody>";
 
-                total += 1
-                print(f"  ok {sym:12s} {price:>13,.4f}")
+    if (!page.length)
+      h += '<tr><td colspan="10" class="dim" style="text-align:center;padding:34px">ไม่พบข้อมูล</td></tr>';
 
-            except Exception as e:
-                print(f"  ERR {sym}: {e}")
+    for (var i = 0; i < page.length; i++) {
+      var r = page[i], n = start + i + 1;
+      var rk = n === 1 ? " rk1" : n === 2 ? " rk2" : n === 3 ? " rk3" : "";
+      h += '<tr class="' + rowClass(r.pct) + '">' +
+        '<td><span class="rk' + rk + '">' + n + '</span><span class="nm"><b>' +
+          esc(r.name || r.sym) + "</b><i>" + esc(r.sym) + "</i></span></td>" +
+        '<td class="ta-c">' + scoreHTML(r._sc) + "</td>" +
+        "<td>" + na(fmtNum(r.price, dp)) + "</td>" +
+        "<td>" + chgHTML(r.chg, dp) + "</td>" +
+        "<td>" + pctHTML(r.pct, maxAbs) + "</td>" +
+        '<td class="ta-c">' + rsiHTML(r.rsi) + "</td>" +
+        '<td class="ta-c">' + sigHTML(r) + "</td>" +
+        "<td>" + na(fmtBig(r.cap)) + "</td>" +
+        "<td>" + na(r.pe ? Number(r.pe).toFixed(2) : null) + "</td>" +
+        "<td>" + na(fmtBig(r.vol)) + "</td></tr>";
+    }
+    return h + "</tbody></table></div>";
+  }
 
-        for tf in buckets:
-            buckets[tf].sort(key=lambda r: (r["pct"] is None, -(r["pct"] or 0)))
-        out["groups"][grp] = buckets
+  function cardsHTML(page, start, dp, capLabel, maxAbs) {
+    if (!page.length) return '<div class="card empty">ไม่พบข้อมูล</div>';
+    var h = '<div class="mcards">';
+    for (var i = 0; i < page.length; i++) {
+      var r = page[i], n = start + i + 1;
+      var rk = n === 1 ? " rk1" : n === 2 ? " rk2" : n === 3 ? " rk3" : "";
+      h += '<article class="mc ' + rowClass(r.pct) + '">' +
+        '<div class="mc-h"><span class="rk' + rk + '">' + n + "</span>" +
+          '<div class="mc-t"><b>' + esc(r.name || r.sym) + "</b><i>" + esc(r.sym) + "</i></div>" +
+          '<div class="mc-p">' + na(fmtNum(r.price, dp)) + "</div></div>" +
+        '<div class="mc-rank"><span>Ranking</span>' + scoreHTML(r._sc) + "</div>" +
+        '<div class="mc-b">' +
+          '<div class="mcell"><span>ผลต่าง ' + TFS[S.tf] + "</span>" + chgHTML(r.chg, dp) + "</div>" +
+          '<div class="mcell"><span>% ' + TF[S.tf] + "</span>" + pctHTML(r.pct, maxAbs) + "</div>" +
+          '<div class="mcell"><span>RSI</span>' + rsiHTML(r.rsi) + "</div>" +
+          '<div class="mcell"><span>' + capLabel + "</span><b>" + na(fmtBig(r.cap)) + "</b></div>" +
+          '<div class="mcell"><span>P/E</span><b>' + na(r.pe ? Number(r.pe).toFixed(2) : null) + "</b></div>" +
+          '<div class="mcell"><span>Volume</span><b>' + na(fmtBig(r.vol)) + "</b></div>" +
+        "</div>" +
+        '<div class="mc-s">' + sigHTML(r) + "</div></article>";
+    }
+    return h + "</div>";
+  }
 
-    out["total"] = total
-    os.makedirs("data", exist_ok=True)
-    with open("data/scan.json", "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"\n✔ data/scan.json — {total} assets")
+  function navHTML(side, cur, totalPages, totalItems) {
+    if (totalPages <= 1) return "";
+    var dots = "";
+    for (var i = 0; i < totalPages; i++) {
+      dots += '<button class="pgd' + (i === cur ? " on" : "") +
+              '" data-side="' + side + '" data-go="' + i + '">' + (i + 1) + "</button>";
+    }
+    return '<div class="pg-nav">' +
+      '<button class="pgb" data-side="' + side + '" data-go="' + (cur - 1) + '"' +
+        (cur === 0 ? " disabled" : "") + ">◀ ก่อนหน้า</button>" +
+      '<div class="pgd-wrap">' + dots + "</div>" +
+      '<button class="pgb" data-side="' + side + '" data-go="' + (cur + 1) + '"' +
+        (cur >= totalPages - 1 ? " disabled" : "") + ">ถัดไป ▶</button>" +
+      '<span class="pg-info">' + (cur * PER + 1) + "-" +
+        Math.min((cur + 1) * PER, totalItems) + " จาก " + totalItems + "</span></div>";
+  }
 
+  function block(side, pill, cls, list) {
+    var g = GRP[S.grp];
+    var dp = S.grp === "currencies" ? 4 : 2;
+    var capLabel = STOCKISH.indexOf(S.grp) > -1 ? "มูลค่าตลาด" : "มูลค่าซื้อขาย";
 
-if __name__ == "__main__":
-    os.makedirs("data", exist_ok=True)
-    fetch_calendar()
-    scan()
+    var maxAbs = 0;
+    for (var m = 0; m < list.length; m++) {
+      var v = Math.abs(list[m].pct || 0);
+      if (v > maxAbs) maxAbs = v;
+    }
+    sortList(list);
+
+    var totalPages = Math.max(1, Math.ceil(list.length / PER));
+    if (PG[side] >= totalPages) PG[side] = totalPages - 1;
+    if (PG[side] < 0) PG[side] = 0;
+
+    var start = PG[side] * PER;
+    var page = list.slice(start, start + PER);
+
+    return '<div class="tblwrap"><div class="tblhead">' +
+      "<h3>" + g.i + " " + g.n + " • " + TF[S.tf] + "</h3>" +
+      '<span class="pill ' + cls + '">' + pill + "</span>" +
+      '<span class="dim sm">' + list.length + " รายการ</span></div>" +
+      '<div class="onlybig">' + tableHTML(page, start, dp, capLabel, maxAbs) + "</div>" +
+      '<div class="onlysmall">' + cardsHTML(page, start, dp, capLabel, maxAbs) + "</div>" +
+      navHTML(side, PG[side], totalPages, list.length) + "</div>";
+  }
+
+  function render() {
+    if (!DATA) return;
+    $("pgScan").setAttribute("data-grp", S.grp);
+
+    var all = getRows();
+    var wp = all.filter(function (r) {
+      return r.pct !== null && r.pct !== undefined && !isNaN(r.pct);
+    });
+
+    var up = 0, dn = 0;
+    for (var i = 0; i < wp.length; i++) {
+      if (wp[i].pct > 0) up++; else if (wp[i].pct < 0) dn++;
+    }
+    $("sUp").textContent = up;
+    $("sDn").textContent = dn;
+
+    wp.sort(function (a, b) { return b.pct - a.pct; });
+    var gain = wp.slice(0, TOPN);
+    var lose = wp.slice(-TOPN).sort(function (a, b) { return a.pct - b.pct; });
+
+    var html = "";
+    if (S.side !== "lose") html += block("gain", "▲ Top " + TOPN + " Gainers", "p-gain", gain);
+    if (S.side !== "gain") html += block("lose", "▼ Top " + TOPN + " Losers", "p-lose", lose);
+
+    $("scanBody").innerHTML = html || '<div class="card empty">ไม่มีข้อมูล</div>';
+    S._count = all.length;
+    updateStatus();
+  }
+
+  /* ---------- เวลา 15 นาที ---------- */
+  function nextSlot() {
+    var d = new Date();
+    d.setSeconds(30, 0);
+    d.setMinutes((Math.floor(d.getMinutes() / 15) + 1) * 15);
+    return d.getTime();
+  }
+
+  function updateStatus() {
+    var left = Math.max(0, nextAt - Date.now());
+    var mm = Math.floor(left / 60000), ss = Math.floor((left % 60000) / 1000);
+    var slot = new Date(nextAt);
+    var txt = "• " + (S._count || 0) + " รายการ | รอบถัดไป " +
+      pad(slot.getHours()) + ":" + pad(slot.getMinutes()) + " (อีก " + pad(mm) + ":" + pad(ss) + ")";
+
+    if (DATA && DATA.updated) {
+      var age = Math.floor((Date.now() - new Date(DATA.updated).getTime()) / 60000);
+      if (age > 45) txt += "  ⚠️ ข้อมูลเก่า " + age + " นาที";
+    }
+    $("sStatus").textContent = txt;
+  }
+
+  function scheduleNext() {
+    nextAt = nextSlot();
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(function () {
+      if (Date.now() >= nextAt) load(); else updateStatus();
+    }, 1000);
+    updateStatus();
+  }
+
+  function load() {
+    $("sStatus").textContent = "กำลังโหลด...";
+    fetch("data/scan.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) {
+        DATA = j;
+        $("sUpd").textContent = new Date(j.updated).toLocaleString("th-TH",
+          { timeZone: TZ, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+        $("sCnt").textContent = j.total || "--";
+        render();
+        scheduleNext();
+      })
+      .catch(function (e) {
+        $("scanBody").innerHTML = '<div class="card empty"><span class="down">โหลดข้อมูลไม่ได้ — ' +
+          esc(e.message) + "</span></div>";
+        $("sStatus").textContent = "ผิดพลาด • ลองใหม่ใน 1 นาที";
+        setTimeout(load, 60000);
+      });
+  }
+
+  /* ---------- events ---------- */
+  var segs = document.querySelectorAll(".seg[data-sgroup]");
+  for (var i = 0; i < segs.length; i++) {
+    (function (seg) {
+      seg.addEventListener("click", function (e) {
+        var btn = e.target.closest("button");
+        if (!btn) return;
+        var v = btn.getAttribute("data-v");
+        if (!v) return;
+        S[seg.getAttribute("data-sgroup")] = v;
+        PG.gain = 0; PG.lose = 0;
+        var b = seg.querySelectorAll("button");
+        for (var k = 0; k < b.length; k++) b[k].className = b[k].getAttribute("data-v") === v ? "on" : "";
+        btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        render();
+      });
+    })(segs[i]);
+  }
+
+  $("scanBody").addEventListener("click", function (e) {
+    var th = e.target.closest("th.sortable");
+    if (th) {
+      var k = th.getAttribute("data-k");
+      if (SORT.key === k) SORT.dir = -SORT.dir;
+      else { SORT.key = k; SORT.dir = (k === "name") ? 1 : -1; }
+      PG.gain = 0; PG.lose = 0;
+      render();
+      return;
+    }
+    var pb = e.target.closest("[data-go]");
+    if (pb && !pb.disabled) {
+      var side = pb.getAttribute("data-side");
+      var go = parseInt(pb.getAttribute("data-go"), 10);
+      if (!isNaN(go) && go >= 0) { PG[side] = go; render(); }
+    }
+  });
+
+  var t;
+  $("sq").addEventListener("input", function (e) {
+    clearTimeout(t);
+    var v = e.target.value.trim().toLowerCase();
+    t = setTimeout(function () { S.q = v; PG.gain = 0; PG.lose = 0; render(); }, 220);
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && nextAt && Date.now() >= nextAt) load();
+  });
+
+  window.SCAN = { load: load };
+  load();
+})();
