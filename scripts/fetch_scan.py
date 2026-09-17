@@ -1,9 +1,61 @@
 # -*- coding: utf-8 -*-
-"""ดึงข้อมูลสินทรัพย์ 7 กลุ่ม x 4 กรอบเวลา + สัญญาณเทคนิค -> data/scan.json"""
+"""ดึงปฏิทินข่าว + สแกนสินทรัพย์ 7 กลุ่ม x 4 กรอบเวลา -> data/"""
 import json, os, math, datetime as dt
 import pandas as pd
+import requests
 import yfinance as yf
 
+# ===================== ปฏิทินข่าว =====================
+CAL_URLS = [
+    "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+    "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json",
+]
+CAL_NEXT = "https://nfs.faireconomy.media/ff_calendar_nextweek.json"
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json"}
+
+
+def get_json(url):
+    r = requests.get(url, timeout=30, headers=UA)
+    if r.status_code != 200:
+        raise RuntimeError(f"HTTP {r.status_code}")
+    if r.text.lstrip().startswith("<"):
+        raise RuntimeError("ได้ HTML (โดน rate limit)")
+    data = r.json()
+    if not isinstance(data, list) or not data:
+        raise RuntimeError("ข้อมูลไม่ใช่ array")
+    return data
+
+
+def fetch_calendar():
+    print("\n=== ปฏิทินข่าว ===")
+    this_week = None
+    for u in CAL_URLS:
+        try:
+            this_week = get_json(u)
+            print(f"  ok {u} -> {len(this_week)} รายการ")
+            break
+        except Exception as e:
+            print(f"  fail {u}: {e}")
+
+    if not this_week:
+        print("  ! ดึงไม่สำเร็จ คงไฟล์เดิมไว้")
+        return
+
+    merged = list(this_week)
+    try:
+        nxt = get_json(CAL_NEXT)
+        merged += nxt
+        print(f"  ok nextweek -> {len(nxt)} รายการ")
+    except Exception as e:
+        print(f"  skip nextweek: {e}")
+
+    os.makedirs("data", exist_ok=True)
+    with open("data/calendar.json", "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"  ✔ data/calendar.json — {len(merged)} รายการ")
+
+
+# ===================== สแกนสินทรัพย์ =====================
 UNIVERSE = {
     "th": [
         "PTT.BK","PTTEP.BK","AOT.BK","ADVANC.BK","CPALL.BK","SCB.BK","KBANK.BK",
@@ -12,7 +64,8 @@ UNIVERSE = {
         "HMPRO.BK","TU.BK","GPSC.BK","BANPU.BK","AWC.BK","LH.BK","INTUCH.BK",
         "CPF.BK","CPAXT.BK","TTB.BK","BTS.BK","EGCO.BK","RATCH.BK","KCE.BK",
         "SAWAD.BK","MTC.BK","TIDLOR.BK","JMT.BK","PTTGC.BK","SPRC.BK","BCP.BK",
-        "WHA.BK","AMATA.BK","SIRI.BK","AP.BK","COM7.BK","SCGP.BK",
+        "WHA.BK","AMATA.BK","SIRI.BK","AP.BK","COM7.BK","SCGP.BK","BJC.BK",
+        "OSP.BK","CBG.BK","TISCO.BK","KKP.BK","BLA.BK","TCAP.BK","STA.BK",
     ],
     "global": [
         "AAPL","MSFT","NVDA","GOOGL","AMZN","META","TSLA","AVGO","AMD","NFLX",
@@ -32,7 +85,7 @@ UNIVERSE = {
         "BTC-USD","ETH-USD","BNB-USD","SOL-USD","XRP-USD","ADA-USD","DOGE-USD",
         "AVAX-USD","TRX-USD","DOT-USD","LINK-USD","MATIC-USD","TON-USD","SHIB-USD",
         "LTC-USD","BCH-USD","NEAR-USD","UNI-USD","APT-USD","ATOM-USD",
-        "ICP-USD","XLM-USD","ARB-USD","OP-USD","INJ-USD",
+        "ICP-USD","XLM-USD","ARB-USD","OP-USD","INJ-USD","FIL-USD","HBAR-USD",
         "MSTR","COIN","MARA","RIOT","IBIT",
     ],
     "commodities": [
@@ -77,7 +130,7 @@ def safe(v):
         return None
 
 
-def build():
+def scan():
     out = {"updated": dt.datetime.utcnow().isoformat() + "Z", "groups": {}, "total": 0}
     total = 0
 
@@ -98,13 +151,11 @@ def build():
                 df = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
                 close = df["Close"].dropna()
                 if len(close) < 3:
-                    print(f"  skip {sym}")
                     continue
 
                 price = float(close.iloc[-1])
                 vol = safe(df["Volume"].iloc[-1]) if "Volume" in df else None
 
-                # ---- สัญญาณเทคนิค ----
                 rsi = rsi14(close)
                 ma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else None
                 ma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else None
@@ -122,7 +173,6 @@ def build():
                         if avg > 0:
                             vspike = round(vol / avg, 2)
 
-                # ---- meta ----
                 name, cap, pe = sym, None, None
                 try:
                     tk = yf.Ticker(sym)
@@ -155,7 +205,7 @@ def build():
                     buckets[tf].append(row)
 
                 total += 1
-                print(f"  ok {sym:12s} {price:>13,.4f}  rsi={rsi}")
+                print(f"  ok {sym:12s} {price:>13,.4f}")
 
             except Exception as e:
                 print(f"  ERR {sym}: {e}")
@@ -172,4 +222,6 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    os.makedirs("data", exist_ok=True)
+    fetch_calendar()
+    scan()
